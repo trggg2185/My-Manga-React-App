@@ -1,0 +1,71 @@
+// Toàn bộ đường dẫn API (không kèm baseURL / context path).
+export const ENDPOINTS = {
+	auth: {
+		register: '/auth/register',
+		login: '/auth/login',
+		logout: '/auth/logout',
+		refresh: '/auth/refresh',
+		introspect: '/auth/introspect',
+	},
+	users: {
+		me: '/users/me',
+		mePassword: '/users/me/password',
+		meJoinRequests: '/users/me/join-requests',
+		meCreationRequests: '/users/me/creation-requests',
+	},
+	categories: {
+		list: '/categories',
+		detail: (id) => `/categories/${id}`,
+		adminList: '/admin/categories',
+		adminDetail: (id) => `/admin/categories/${id}`,
+	},
+	manga: {
+		list: '/mangas',
+		detail: (id) => `/mangas/${id}`,
+		create: '/mangas',
+		update: (mangaId) => `/mangas/${mangaId}`,
+		removeGroup: (mangaId, groupId) => `/mangas/${mangaId}/transgroups/${groupId}`,
+		byGroup: (groupId) => `/transgroups/${groupId}/mangas`,
+		leaveGroup: (groupId, mangaId) => `/transgroups/${groupId}/mangas/${mangaId}`,
+		adminList: '/admin/mangas',
+	},
+	chapters: {
+		listByManga: (mangaId) => `/mangas/${mangaId}/chapters`,
+		create: (mangaId) => `/mangas/${mangaId}/chapters`,
+		remove: (mangaId, chapterId) => `/mangas/${mangaId}/chapters/${chapterId}`,
+		pages: (chapterId) => `/chapters/${chapterId}/pages`,
+	},
+	transGroups: {
+		list: '/transgroups',
+		detail: (id) => `/transgroups/${id}`,
+		update: (id) => `/transgroups/${id}`,
+		remove: (id) => `/transgroups/${id}`,
+		kickMember: (groupId, userId) => `/transgroups/${groupId}/users/${userId}`,
+		adminList: '/admin/transgroups',
+	},
+	joinRequests: {
+		create: (groupId) => `/transgroups/${groupId}/join-requests`,
+		listMine: '/users/me/join-requests',
+		listByGroup: (groupId) => `/transgroups/${groupId}/join-requests`,
+		approve: (groupId, requestId) => `/transgroups/${groupId}/join-requests/${requestId}/approve`,
+		reject: (groupId, requestId) => `/transgroups/${groupId}/join-requests/${requestId}/reject`,
+	},
+	creationRequests: {
+		create: '/creation-requests',
+		adminList: '/admin/creation-requests',
+		approve: (requestId) => `/admin/creation-requests/${requestId}/approve`,
+		reject: (requestId) => `/admin/creation-requests/${requestId}/reject`,
+	},
+	admin: {
+		users: '/admin/users',
+		user: (id) => `/admin/users/${id}`,
+		roles: '/admin/roles',
+		role: (id) => `/admin/roles/${id}`,
+		permissions: '/admin/permissions',
+		permission: (id) => `/admin/permissions/${id}`,
+	},
+	files: {
+		upload: '/files/upload',
+		uploadMulti: '/files/upload-multi',
+	},
+};
