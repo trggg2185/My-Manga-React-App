@@ -10,7 +10,7 @@ export default function GroupCard({ group, index = 0 }) {
 		>
 			<div className="flex items-center gap-3">
 				<Cover
-					src={group.coverImageUrl}
+					src={group.avatar ?? group.coverImageUrl}
 					name={group.name}
 					className="h-11 w-11 rounded-xl"
 					textClass="text-lg"

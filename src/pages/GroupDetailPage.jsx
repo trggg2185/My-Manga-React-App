@@ -1,29 +1,43 @@
 import { useState } from 'react';
-import { Link, useParams } from 'react-router-dom';
+import { useParams } from 'react-router-dom';
 import { groupApi, joinRequestApi } from '../api';
 import { useFetch } from '../hooks/useFetch';
 import { useMutation } from '../hooks/useMutation';
 import { useCurrentUser } from '../hooks/useCurrentUser';
+import { useMyGroup } from '../hooks/useMyGroup';
 import { useAuth } from '../auth/useAuth';
 import { JOIN_REQUEST_STATUS, JOIN_REQUEST_TONE } from '../utils/format';
-import PageHeader from '../components/common/PageHeader';
 import Loading from '../components/common/Loading';
 import ErrorMessage from '../components/common/ErrorMessage';
 import EmptyState from '../components/common/EmptyState';
 import Badge from '../components/common/Badge';
 import Button from '../components/common/Button';
-import Input from '../components/common/Input';
-import Textarea from '../components/common/Textarea';
-import ImageUploadField from '../components/common/ImageUploadField';
+import Cover from '../components/common/Cover';
+import Avatar from '../components/common/Avatar';
+import MangaGrid from '../components/manga/MangaGrid';
+import EditGroupModal from '../components/group/EditGroupModal';
 
 function GroupDetailPage() {
 	const { id } = useParams();
 	const { isAuthenticated } = useAuth();
 	const { data: me } = useCurrentUser();
+	const { data: mine } = useMyGroup();
+	const myGroupStatus = mine?.status;
 	const [editing, setEditing] = useState(false);
-	const [form, setForm] = useState({ name: '', coverImageUrl: '', description: '' });
+	const [tab, setTab] = useState('mangas');
 
-	const { data: group, error, loading, reload } = useFetch(() => groupApi.get(id), [id]);
+	// Chi tiết nhóm không có avatar -> ghép avatar từ danh sách nhóm (summary).
+	const { data, error, loading, reload } = useFetch(async () => {
+		const [group, list] = await Promise.all([
+			groupApi.get(id),
+			groupApi.list({ page: 0, size: 100, sortBy: 'createdAt' }).catch(() => null),
+		]);
+		const summary = (list?.content ?? []).find((item) => item.id === id);
+		return { group, avatar: summary?.avatar ?? summary?.coverImageUrl ?? null };
+	}, [id]);
+
+	const group = data?.group;
+	const avatar = data?.avatar;
 
 	const isLeader = Boolean(me && group && me.id === group.leader?.id);
 	const isMember = Boolean(me && group?.members?.some((member) => member.id === me.id));
@@ -41,22 +55,12 @@ function GroupDetailPage() {
 	if (error) return <ErrorMessage error={error} onRetry={reload} />;
 	if (!group) return null;
 
-	const startEditing = () => {
-		setForm({ name: group.name ?? '', coverImageUrl: group.coverImageUrl ?? '', description: group.description ?? '' });
-		setEditing(true);
-	};
-
-	const submitEdit = (e) => {
-		e.preventDefault();
-		groupMutation.run(async () => {
-			const payload = { ...form };
-			// ảnh bìa rỗng thì bỏ field để giữ nguyên bìa cũ
-			if (!payload.coverImageUrl) delete payload.coverImageUrl;
-			await groupApi.update(id, payload);
-			setEditing(false);
-			reload();
-		}, 'Đã cập nhật nhóm.');
-	};
+	// Leader luôn đứng đầu danh sách thành viên.
+	const members = [];
+	if (group.leader) members.push(group.leader);
+	(group.members ?? []).forEach((member) => {
+		if (member.id !== group.leader?.id) members.push(member);
+	});
 
 	const handleJoin = () => joinMutation.run(() => joinRequestApi.create(id), 'Đã gửi yêu cầu tham gia.');
 
@@ -74,79 +78,92 @@ function GroupDetailPage() {
 			reload();
 		}, action === 'approve' ? 'Đã duyệt yêu cầu.' : 'Đã từ chối yêu cầu.');
 
+	const tabs = [
+		{ key: 'mangas', label: `Truyện tranh (${group.translatedMangas?.length ?? 0})` },
+		{ key: 'members', label: `Thành viên (${members.length})` },
+	];
+
 	return (
 		<section className="animate-fade-up">
-			<PageHeader
-				title={group.name}
-				subtitle={`@${group.slug}`}
-				actions={
-					isLeader ? (
-						<Button variant="ghost" onClick={startEditing}>
+			<div className="overflow-hidden rounded-2xl border border-white/10">
+				<Cover
+					src={group.coverImageUrl}
+					name={group.name}
+					className="aspect-[16/6] w-full"
+					textClass="text-6xl"
+				/>
+			</div>
+
+			<div className="mt-4 flex flex-wrap items-center gap-4">
+				<Cover
+					src={avatar}
+					name={group.name}
+					className="h-20 w-20 shrink-0 rounded-2xl border border-white/10"
+					textClass="text-3xl"
+				/>
+				<div className="min-w-0 flex-1">
+					<h1 className="text-2xl font-bold text-white">{group.name}</h1>
+					<p className="text-sm text-neutral-500">@{group.slug}</p>
+				</div>
+				<div className="flex items-center gap-2">
+					{isLeader && (
+						<Button variant="ghost" onClick={() => setEditing(true)}>
 							Chỉnh sửa
 						</Button>
-					) : isAuthenticated && !isMember && !me?.transGroupId ? (
+					)}
+					{!isLeader && isAuthenticated && !isMember && myGroupStatus === 'NONE' && (
 						<Button onClick={handleJoin} disabled={joinMutation.loading}>
 							Xin tham gia
 						</Button>
-					) : null
-				}
-			/>
-
-			{joinMutation.message && <p className="mb-4 text-sm text-emerald-400">{joinMutation.message}</p>}
-			{joinMutation.error && (
-				<p className="mb-4 text-sm text-red-400">
-					Lỗi ({joinMutation.error.code}): {joinMutation.error.message}
-				</p>
-			)}
-			{groupMutation.error && (
-				<p className="mb-4 text-sm text-red-400">
-					Lỗi ({groupMutation.error.code}): {groupMutation.error.message}
-				</p>
-			)}
-
-			{editing && (
-				<form onSubmit={submitEdit} className="mb-6 space-y-4 rounded-2xl border border-white/10 bg-ink-900 p-5">
-					<Input
-						label="Tên nhóm"
-						value={form.name}
-						onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
-					/>
-					<ImageUploadField
-						value={form.coverImageUrl}
-						onChange={(url) => setForm((f) => ({ ...f, coverImageUrl: url }))}
-					/>
-					<Textarea
-						label="Mô tả"
-						value={form.description}
-						onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))}
-					/>
-					<div className="flex gap-2">
-						<Button type="submit" disabled={groupMutation.loading}>
-							{groupMutation.loading ? 'Đang lưu...' : 'Lưu'}
-						</Button>
-						<Button variant="ghost" onClick={() => setEditing(false)}>
-							Huỷ
-						</Button>
-					</div>
-				</form>
-			)}
+					)}
+				</div>
+			</div>
 
 			{group.description && (
-				<p className="mb-8 whitespace-pre-line text-sm leading-relaxed text-neutral-400">
+				<p className="mt-4 whitespace-pre-line text-sm leading-relaxed text-neutral-400">
 					{group.description}
 				</p>
 			)}
 
-			<section className="mb-10">
-				<h2 className="mb-3 text-lg font-semibold text-white">Thành viên ({group.members?.length ?? 0})</h2>
-				{group.members?.length === 0 ? (
-					<EmptyState>Nhóm chưa có thành viên.</EmptyState>
+			{joinMutation.message && <p className="mt-4 text-sm text-emerald-400">{joinMutation.message}</p>}
+			{joinMutation.error && (
+				<p className="mt-4 text-sm text-red-400">
+					Lỗi ({joinMutation.error.code}): {joinMutation.error.message}
+				</p>
+			)}
+			{groupMutation.error && (
+				<p className="mt-4 text-sm text-red-400">
+					Lỗi ({groupMutation.error.code}): {groupMutation.error.message}
+				</p>
+			)}
+
+			<div className="mt-8 flex gap-1 border-b border-white/10">
+				{tabs.map((item) => (
+					<button
+						key={item.key}
+						type="button"
+						onClick={() => setTab(item.key)}
+						className={`-mb-px border-b-2 px-4 py-2.5 text-sm font-medium transition-colors duration-200 ${
+							tab === item.key
+								? 'border-white text-white'
+								: 'border-transparent text-neutral-500 hover:text-neutral-200'
+						}`}
+					>
+						{item.label}
+					</button>
+				))}
+			</div>
+
+			<div className="mt-6">
+				{tab === 'mangas' ? (
+					<MangaGrid mangas={group.translatedMangas ?? []} />
 				) : (
 					<ul className="divide-y divide-white/5 overflow-hidden rounded-2xl border border-white/10 bg-ink-900">
-						{group.members?.map((member) => (
-							<li key={member.id} className="flex items-center justify-between px-4 py-3">
-								<span className="flex items-center gap-3 text-sm text-neutral-200">
-									{member.username}
+						{members.map((member) => (
+							<li key={member.id} className="flex items-center justify-between gap-3 px-4 py-3">
+								<span className="flex items-center gap-3">
+									<Avatar src={member.avatar} name={member.username} size={32} />
+									<span className="text-sm text-neutral-200">{member.username}</span>
 									{member.id === group.leader?.id && <Badge tone="sky">Leader</Badge>}
 								</span>
 								{isLeader && member.id !== group.leader?.id && (
@@ -158,29 +175,22 @@ function GroupDetailPage() {
 						))}
 					</ul>
 				)}
-			</section>
+			</div>
 
-			<section className="mb-10">
-				<h2 className="mb-3 text-lg font-semibold text-white">Truyện đang dịch</h2>
-				{group.translatedMangas?.length === 0 ? (
-					<EmptyState>Nhóm chưa dịch truyện nào.</EmptyState>
-				) : (
-					<div className="flex flex-wrap gap-2">
-						{group.translatedMangas?.map((manga) => (
-							<Link
-								key={manga.id}
-								to={`/mangas/${manga.id}`}
-								className="rounded-lg border border-white/10 bg-ink-900 px-3 py-1.5 text-sm text-neutral-300 transition-colors duration-200 hover:border-white/30 hover:text-white"
-							>
-								{manga.name}
-							</Link>
-						))}
-					</div>
-				)}
-			</section>
+			{editing && (
+				<EditGroupModal
+					group={group}
+					avatar={avatar}
+					onClose={() => setEditing(false)}
+					onSaved={() => {
+						setEditing(false);
+						reload();
+					}}
+				/>
+			)}
 
 			{isLeader && (
-				<section>
+				<section className="mt-10">
 					<h2 className="mb-3 text-lg font-semibold text-white">Yêu cầu tham gia (chờ duyệt)</h2>
 					{requestMutation.message && (
 						<p className="mb-3 text-sm text-emerald-400">{requestMutation.message}</p>
@@ -190,10 +200,7 @@ function GroupDetailPage() {
 					) : (
 						<ul className="divide-y divide-white/5 overflow-hidden rounded-2xl border border-white/10 bg-ink-900">
 							{joinRequests.map((request) => (
-								<li
-									key={request.id}
-									className="flex items-center justify-between gap-3 px-4 py-3"
-								>
+								<li key={request.id} className="flex items-center justify-between gap-3 px-4 py-3">
 									<span className="flex items-center gap-3 text-sm text-neutral-200">
 										{request.username}
 										<Badge tone={JOIN_REQUEST_TONE[request.status]}>

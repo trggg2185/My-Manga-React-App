@@ -57,15 +57,6 @@ function MangaDetailPage() {
 						))}
 					</div>
 
-					{manga.transGroups?.length > 0 && (
-						<p className="mt-4 text-sm text-neutral-500">
-							Nhóm dịch:{' '}
-							<span className="text-neutral-300">
-								{manga.transGroups.map((group) => group.name).join(', ')}
-							</span>
-						</p>
-					)}
-
 					{manga.description && (
 						<p className="mt-4 whitespace-pre-line text-sm leading-relaxed text-neutral-400">
 							{manga.description}
@@ -73,6 +64,34 @@ function MangaDetailPage() {
 					)}
 				</div>
 			</div>
+
+			{manga.transGroups?.length > 0 && (
+				<section className="mt-8">
+					<h2 className="mb-3 text-lg font-semibold text-white">Nhóm dịch</h2>
+					<div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+						{manga.transGroups.map((group) => (
+							<Link
+								key={group.id}
+								to={`/groups/${group.id}`}
+								className="group flex items-center gap-3 rounded-2xl border border-white/10 bg-ink-900 p-4 transition-colors duration-200 hover:border-white/25 hover:bg-white/5"
+							>
+								<Cover
+									src={group.avatar ?? group.coverImageUrl}
+									name={group.name}
+									className="h-11 w-11 shrink-0 rounded-xl"
+									textClass="text-lg"
+								/>
+								<div className="min-w-0">
+									<p className="truncate text-sm font-semibold text-neutral-100 group-hover:text-white">
+										{group.name}
+									</p>
+									<p className="truncate text-xs text-neutral-500">@{group.slug}</p>
+								</div>
+							</Link>
+						))}
+					</div>
+				</section>
+			)}
 
 			<section className="mt-10">
 				<h2 className="mb-4 text-lg font-semibold text-white">Danh sách chương</h2>

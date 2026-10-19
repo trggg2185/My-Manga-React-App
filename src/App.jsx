@@ -43,8 +43,8 @@ function App() {
 				<Route element={<ProtectedRoute roles={['TRANSLATOR', 'ADMIN']} />}>
 					<Route path="manage" element={<MyMangaPage />} />
 					<Route path="manage/mangas/new" element={<MangaEditorPage />} />
-					<Route path="manage/mangas/:mangaId" element={<ManageMangaPage />} />
-					<Route path="manage/mangas/:mangaId/edit" element={<MangaEditorPage />} />
+					<Route path="manage/mangas/:mangaId" element={<MangaEditorPage />} />
+					<Route path="manage/mangas/:mangaId/chapters" element={<ManageMangaPage />} />
 					<Route path="manage/mangas/:mangaId/chapters/new" element={<ChapterEditorPage />} />
 				</Route>
 

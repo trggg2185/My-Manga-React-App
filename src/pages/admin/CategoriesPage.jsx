@@ -17,6 +17,15 @@ function CategoriesPage() {
 
 	const submit = (e) => {
 		e.preventDefault();
+		// Sửa thể loại mà không đổi gì -> không gọi API.
+		if (
+			editing &&
+			form.name === (editing.name ?? '') &&
+			form.description === (editing.description ?? '')
+		) {
+			mutation.setMessage('Không có thay đổi nào.');
+			return;
+		}
 		mutation.run(async () => {
 			if (editing) await categoryApi.update(editing.id, form);
 			else await categoryApi.create(form);

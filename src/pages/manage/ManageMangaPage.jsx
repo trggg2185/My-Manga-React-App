@@ -1,8 +1,7 @@
-import { Link, useNavigate, useParams } from 'react-router-dom';
+import { Link, useParams } from 'react-router-dom';
 import { chapterApi, mangaApi } from '../../api';
 import { useFetch } from '../../hooks/useFetch';
 import { useMutation } from '../../hooks/useMutation';
-import { useCurrentUser } from '../../hooks/useCurrentUser';
 import { formatDate } from '../../utils/format';
 import PageHeader from '../../components/common/PageHeader';
 import Loading from '../../components/common/Loading';
@@ -12,8 +11,6 @@ import Button from '../../components/common/Button';
 
 function ManageMangaPage() {
 	const { mangaId } = useParams();
-	const navigate = useNavigate();
-	const { data: me } = useCurrentUser();
 	const mutation = useMutation();
 
 	const { data, error, loading, reload } = useFetch(
@@ -40,28 +37,19 @@ function ManageMangaPage() {
 		}, 'Đã xoá chương.');
 	};
 
-	const handleLeaveGroup = () => {
-		if (!window.confirm('Cho nhóm bạn rời khỏi truyện này?')) return;
-		mutation.run(async () => {
-			await mangaApi.leaveGroup(me.transGroupId, mangaId);
-			navigate('/manage');
-		}, 'Đã rời khỏi truyện.');
-	};
-
 	return (
 		<section className="animate-fade-up">
+			<Link to="/manage" className="mb-4 inline-block text-sm text-neutral-500 hover:text-white">
+				← Quay lại quản lý truyện
+			</Link>
+
 			<PageHeader
-				title={manga?.name}
-				subtitle="Quản lý chương"
+				title="Quản lý chương"
+				subtitle={manga?.name}
 				actions={
-					<>
-						<Link to={`/manage/mangas/${mangaId}/edit`}>
-							<Button variant="ghost">Sửa truyện</Button>
-						</Link>
-						<Link to={`/manage/mangas/${mangaId}/chapters/new`}>
-							<Button>+ Thêm chương</Button>
-						</Link>
-					</>
+					<Link to={`/manage/mangas/${mangaId}/chapters/new`}>
+						<Button>+ Thêm chương</Button>
+					</Link>
 				}
 			/>
 
@@ -93,17 +81,6 @@ function ManageMangaPage() {
 						</li>
 					))}
 				</ul>
-			)}
-
-			{me?.transGroupId && (
-				<div className="mt-10 rounded-2xl border border-red-500/20 bg-red-500/5 p-5">
-					<p className="text-sm text-neutral-400">
-						Cho nhóm của bạn rời khỏi truyện này (truyện phải còn ít nhất một nhóm khác).
-					</p>
-					<Button variant="danger" className="mt-3" onClick={handleLeaveGroup}>
-						Rời khỏi truyện
-					</Button>
-				</div>
 			)}
 		</section>
 	);

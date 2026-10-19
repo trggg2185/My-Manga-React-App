@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { Link, useNavigate, useParams } from 'react-router-dom';
 import { categoryApi, mangaApi } from '../../api';
 import { useFetch } from '../../hooks/useFetch';
 import { useMutation } from '../../hooks/useMutation';
@@ -21,8 +21,9 @@ function MangaEditorPage() {
 	const isEdit = Boolean(mangaId);
 
 	const { data: categories } = useFetch(() => categoryApi.list(), []);
+	// Sửa truyện phải dùng endpoint riêng cho leader (spec §7.4).
 	const { data: manga, loading, error } = useFetch(
-		() => (isEdit ? mangaApi.get(mangaId) : Promise.resolve(null)),
+		() => (isEdit ? mangaApi.getManagement(mangaId) : Promise.resolve(null)),
 		[mangaId],
 	);
 
@@ -62,10 +63,42 @@ function MangaEditorPage() {
 
 	const submit = (e) => {
 		e.preventDefault();
+
+		if (isEdit) {
+			const originalCategoryIds = manga?.categories?.map((category) => category.id) ?? [];
+			const unchanged =
+				form.name === (manga?.name ?? '') &&
+				form.coverImageUrl === (manga?.coverImageUrl ?? '') &&
+				form.status === (manga?.status ?? 'ONGOING') &&
+				form.description === (manga?.description ?? '') &&
+				form.categoryIds.length === originalCategoryIds.length &&
+				form.categoryIds.every((id) => originalCategoryIds.includes(id));
+			if (unchanged) {
+				mutation.setMessage('Không có thay đổi nào.');
+				return;
+			}
+		}
+
 		mutation.run(async () => {
-			const payload = { ...form };
-			// ảnh bìa rỗng thì bỏ field (create: không có bìa; update: giữ nguyên bìa cũ)
-			if (!payload.coverImageUrl) delete payload.coverImageUrl;
+			const payload = {
+				name: form.name,
+				status: form.status,
+				description: form.description,
+				categoryIds: form.categoryIds,
+			};
+
+			if (isEdit) {
+				// Chỉ gửi ảnh bìa khi thực sự đổi: backend promote lại URL mỗi khi nhận
+				// field này, gửi lại URL cũ (đã promote) sẽ bị coi là không hợp lệ.
+				if (form.coverImageUrl && form.coverImageUrl !== (manga?.coverImageUrl ?? '')) {
+					payload.coverImageUrl = form.coverImageUrl;
+				}
+			} else {
+				// Tạo mới: chỉ gửi bìa/tác giả khi có giá trị.
+				if (form.coverImageUrl) payload.coverImageUrl = form.coverImageUrl;
+				if (form.authorsName) payload.authorsName = form.authorsName;
+			}
+
 			if (isEdit) await mangaApi.update(mangaId, payload);
 			else await mangaApi.create(payload);
 			navigate('/manage');
@@ -74,7 +107,17 @@ function MangaEditorPage() {
 
 	return (
 		<section className="animate-fade-up">
-			<PageHeader title={isEdit ? 'Sửa truyện' : 'Tạo truyện mới'} />
+			<PageHeader
+				title={isEdit ? 'Chi tiết truyện' : 'Tạo truyện mới'}
+				subtitle={isEdit ? 'Cập nhật thông tin truyện' : undefined}
+				actions={
+					isEdit && (
+						<Link to={`/manage/mangas/${mangaId}/chapters`}>
+							<Button variant="ghost">Quản lý chương</Button>
+						</Link>
+					)
+				}
+			/>
 
 			<form onSubmit={submit} className="max-w-2xl space-y-4 rounded-2xl border border-white/10 bg-ink-900 p-6">
 				<Input
@@ -82,11 +125,13 @@ function MangaEditorPage() {
 					value={form.name}
 					onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
 				/>
-				<Input
-					label="Tác giả"
-					value={form.authorsName}
-					onChange={(e) => setForm((f) => ({ ...f, authorsName: e.target.value }))}
-				/>
+				{!isEdit && (
+					<Input
+						label="Tác giả"
+						value={form.authorsName}
+						onChange={(e) => setForm((f) => ({ ...f, authorsName: e.target.value }))}
+					/>
+				)}
 				<ImageUploadField
 					value={form.coverImageUrl}
 					onChange={(url) => setForm((f) => ({ ...f, coverImageUrl: url }))}
@@ -128,6 +173,7 @@ function MangaEditorPage() {
 					onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))}
 				/>
 
+				{mutation.message && <p className="text-sm text-neutral-400">{mutation.message}</p>}
 				{mutation.error && (
 					<p className="text-sm text-red-400">
 						Lỗi ({mutation.error.code}): {mutation.error.message}

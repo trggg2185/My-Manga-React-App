@@ -52,6 +52,17 @@ function ProfilePage() {
 
 	const submitProfile = (e) => {
 		e.preventDefault();
+		// Không có field nào khác dữ liệu gốc và không chọn avatar mới -> không gọi API.
+		const unchanged =
+			!form.avatar &&
+			form.email === (me?.email ?? '') &&
+			form.facebook === (me?.facebook ?? '') &&
+			form.discord === (me?.discord ?? '') &&
+			form.bio === (me?.bio ?? '');
+		if (unchanged) {
+			profileMutation.setMessage('Không có thay đổi nào.');
+			return;
+		}
 		profileMutation.run(async () => {
 			await userApi.updateMe(form);
 			setAvatarPreview(null);

@@ -5,6 +5,7 @@
  *
  * @typedef {'COMPLETED'|'ONGOING'|'ONHOLD'} MangaStatus
  * @typedef {'APPROVED'|'DELETED'} TransGroupStatus
+ * @typedef {'LEADER'|'MEMBER'|'PENDING_REQUEST'|'NONE'} MyGroupStatus
  * @typedef {'PENDING'|'APPROVED'|'REJECTED'} GroupJoinRequestStatus
  * @typedef {'PENDING'|'APPROVED'|'REJECTD'} GroupCreationRequestStatus
  * @typedef {'ADMIN'|'USER'|'TRANSLATOR'} RoleName
@@ -141,6 +142,23 @@
  * @property {string|null} description
  * @property {string} createdAt
  *
+ * @typedef {Object} MangaManagementResponse
+ * @property {string} id
+ * @property {string} name
+ * @property {string} slug
+ * @property {string} [coverImageUrl]
+ * @property {MangaStatus} status
+ * @property {string|null} description
+ * @property {CategoryResponse[]} categories
+ * @property {TransGroupManagementResponse[]} transGroups
+ * @property {string} updatedAt
+ *
+ * @typedef {Object} TransGroupManagementResponse
+ * @property {string} id
+ * @property {string} name
+ * @property {string} slug
+ * @property {boolean} canRemove
+ *
  * @typedef {Object} ChapterRequest
  * @property {number} chapterIndex
  * @property {string} [title] <=200
@@ -174,6 +192,7 @@
  * @property {string} name
  * @property {string} slug
  * @property {string} [coverImageUrl]
+ * @property {string} [avatar] backend hiện trả field này ở summary
  *
  * @typedef {Object} TransGroupUpdateRequest
  * @property {string} [name] 5..50
@@ -200,6 +219,10 @@
  * @property {UserSummaryResponse[]} members
  * @property {string|null} description
  * @property {string} createdAt
+ *
+ * @typedef {Object} TransGroupOfUserResponse
+ * @property {TransGroupSummaryResponse} [transGroup]
+ * @property {MyGroupStatus} status
  *
  * @typedef {Object} CreationRequest
  * @property {string} groupName 5..50

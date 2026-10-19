@@ -237,6 +237,9 @@ type MangaStatus = 'COMPLETED' | 'ONGOING' | 'ONHOLD';
 // TransGroupStatus
 type TransGroupStatus = 'APPROVED' | 'DELETED';
 
+// MyGroupStatus — quan hệ của user hiện tại với nhóm dịch
+type MyGroupStatus = 'LEADER' | 'MEMBER' | 'PENDING_REQUEST' | 'NONE';
+
 // GroupJoinRequestStatus
 type GroupJoinRequestStatus = 'PENDING' | 'APPROVED' | 'REJECTED';
 
@@ -486,6 +489,11 @@ interface TransGroupDetailsResponse {
   createdAt: string;
 }
 
+interface TransGroupOfUserResponse {
+  transGroup?: TransGroupSummaryResponse;
+  status: MyGroupStatus;
+}
+
 interface DeleteTransGroupResponse { groupId: string; }
 interface DeleteMemberResponse { groupId: string; memberId: string; }
 
@@ -628,6 +636,7 @@ Behavior notes:
 
 | Method | Path | Auth | Role | RL | Body | Result |
 | --- | --- | --- | --- | --- | --- | --- |
+| GET | `/users/me/transgroups` | yes | current user | none | — | `TransGroupOfUserResponse` |
 | GET | `/transgroups` | no | — | `60/60 IP` | `page=0&size=20&sortBy=createdAt` | `PaginatedResponse<TransGroupSummaryResponse>` (APPROVED only) |
 | GET | `/transgroups/{id}` | no | — | — | — | `TransGroupDetailsResponse` |
 | PATCH | `/transgroups/{id}` | yes | group leader or ADMIN | `10/60` | `TransGroupUpdateRequest` | `TransGroupResponse` |
@@ -637,6 +646,21 @@ Behavior notes:
 
 Notes: the public list only returns `APPROVED` groups. `GET /transgroups/{id}` returns
 leader, members, and translated manga regardless of who calls it.
+
+`GET /users/me/transgroups` requires a valid access token and identifies the current
+user's group state. The response has these meanings:
+
+- `status: "LEADER"`: the user leads an approved group; `transGroup` contains its summary.
+- `status: "MEMBER"`: the user belongs to an approved group as a member;
+  `transGroup` contains that group's summary.
+- `status: "PENDING_REQUEST"`: the user has a pending group-creation or join request;
+  `transGroup` is omitted/null.
+- `status: "NONE"`: the user neither belongs to nor leads an approved group and has no
+  pending group request; `transGroup` is omitted/null.
+
+The backend checks approved membership before approved leadership. Frontend should use
+`status` as the source of truth, treat `transGroup` as optional, and redirect to login
+on an unauthenticated `401` response.
 
 ### 7.7 Join requests
 

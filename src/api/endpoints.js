@@ -22,11 +22,13 @@ export const ENDPOINTS = {
 	manga: {
 		list: '/mangas',
 		detail: (id) => `/mangas/${id}`,
+		management: (mangaId) => `/mangas/${mangaId}/management`,
 		create: '/mangas',
 		update: (mangaId) => `/mangas/${mangaId}`,
-		removeGroup: (mangaId, groupId) => `/mangas/${mangaId}/transgroups/${groupId}`,
+		// Nhóm rời truyện (giữ truyện) vs xoá hẳn truyện — spec §7.4.
+		leaveManga: (mangaId, groupId) => `/mangas/${mangaId}/transgroups/${groupId}`,
 		byGroup: (groupId) => `/transgroups/${groupId}/mangas`,
-		leaveGroup: (groupId, mangaId) => `/transgroups/${groupId}/mangas/${mangaId}`,
+		deleteManga: (groupId, mangaId) => `/transgroups/${groupId}/mangas/${mangaId}`,
 		adminList: '/admin/mangas',
 	},
 	chapters: {
@@ -36,6 +38,7 @@ export const ENDPOINTS = {
 		pages: (chapterId) => `/chapters/${chapterId}/pages`,
 	},
 	transGroups: {
+		mine: '/users/me/transgroups',
 		list: '/transgroups',
 		detail: (id) => `/transgroups/${id}`,
 		update: (id) => `/transgroups/${id}`,

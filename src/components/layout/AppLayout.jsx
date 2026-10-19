@@ -85,11 +85,6 @@ function AppLayout() {
 						<NavLink to="/groups" className={navLinkClass}>
 							Nhóm dịch
 						</NavLink>
-						{hasRole('TRANSLATOR', 'ADMIN') && (
-							<NavLink to="/manage" className={navLinkClass}>
-								Quản lý
-							</NavLink>
-						)}
 						{hasRole('ADMIN') && (
 							<NavLink to="/admin" className={navLinkClass}>
 								Quản trị
