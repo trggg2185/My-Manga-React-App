@@ -3,6 +3,9 @@ import { ENDPOINTS } from './endpoints';
 import { toFormData } from '../utils/formData';
 
 export const userApi = {
+	/* --- public profile --- */
+	getProfile: (username) => axiosClient.get(ENDPOINTS.users.profile(username)),
+
 	/* --- current user --- */
 	getMe: () => axiosClient.get(ENDPOINTS.users.me),
 	updateMe: (fields) => axiosClient.patch(ENDPOINTS.users.me, toFormData(fields), multipart()),

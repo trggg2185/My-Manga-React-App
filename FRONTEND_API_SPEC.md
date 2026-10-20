@@ -299,6 +299,19 @@ interface CurrentUserResponse {
 
 interface UserSummaryResponse { id: string; username: string; avatar: string | null; }
 
+// GET /users/{username} — public profile, dùng được cho cả chính mình.
+// Không trả email, roles hay mật khẩu.
+interface PublicUserProfileResponse {
+  id: string;
+  username: string;
+  avatar: string | null;
+  bio: string | null;
+  facebook: string | null;
+  discord: string | null;
+  createdAt: string; // ISO-8601 instant
+  transGroup: TransGroupSummaryResponse | null; // nhóm APPROVED (member hoặc leader)
+}
+
 interface UserResponse {
   id: string;
   username: string;
@@ -570,6 +583,19 @@ with `null`/omitted values are ignored (partial update). Uploading a new avatar 
 the old one. Note: `/users/me` does **not** return roles; decode the JWT `scope` claim
 for role-based UI.
 
+### 7.2.1 Public user profile (public)
+
+| Method | Path | Auth | Role | RL | Body | Result |
+| --- | --- | --- | --- | --- | --- | --- |
+| GET | `/users/{username}` | no | — | — | — | `PublicUserProfileResponse` |
+
+- Ai cũng xem được, kể cả khách chưa đăng nhập; dùng được để xem chính mình.
+- Chỉ trả thông tin công khai: `id`, `username`, `avatar`, `bio`, `facebook`,
+  `discord`, `createdAt`, `transGroup`. **Không** có `email`, `roles`, mật khẩu.
+- `transGroup` là nhóm `APPROVED` mà user đang là member hoặc leader; `null` nếu không có.
+- `username` không phân biệt hoa thường. Không tồn tại → `4101` `USER_NOT_FOUND` (HTTP 404).
+- Không trả kèm truyện/chương của user.
+
 ### 7.3 Categories
 
 | Method | Path | Auth | Role | RL | Body | Result |
@@ -621,16 +647,18 @@ Behavior notes:
 | GET | `/mangas/{mangaId}/chapters` | no | — | `60/60 IP` | `page=0&size=20&sortBy=chapterIndex` | `PaginatedResponse<ChapterSummaryResponse>` |
 | POST | `/mangas/{mangaId}/chapters` | yes | ADMIN or TRANSLATOR member of manga | `10/60` | `ChapterRequest` | `ChapterResponse` |
 | DELETE | `/mangas/{mangaId}/chapters/{chapterId}` | yes | member/leader of manga | `10/60` | — | `DeleteChapterResponse` |
-| GET | `/chapters/{chapterId}/pages` | no | — | `60/60 IP` | — | `PageResponse[]` (not paginated) |
+| GET | `/chapters/{chapterId}/pages` | no | — | `60/60 IP` | — | `PageResponse[]` |
 
 Behavior notes:
 
 - The chapter list is sorted by `chapterIndex` descending by default.
 - `GET /chapters/{chapterId}/pages` also records a view (counted once per reader per
   30 minutes; `views` is shown in chapter responses).
+- `GET /chapters/{chapterId}/pages` returns **all** pages of the chapter in one request as
+  `result: PageResponse[]`, sorted by `pageNumber` ascending (no pagination metadata).
+  Lazy loading of images is a frontend concern.
 - Creating a chapter requires `pageUrls` produced by the upload endpoints (see §8).
-  Chapter pages are stored in order and later returned as `PageResponse[]` ordered by
-  `pageNumber`.
+  Page numbers are assigned from 1 in upload/list order and are unique within a chapter.
 
 ### 7.6 Translation groups
 
@@ -818,6 +846,7 @@ src/
     ChapterReaderPage  // GET /chapters/{chapterId}/pages
     GroupsPage         // GET /transgroups
     GroupDetailPage    // GET /transgroups/{id}
+    UserProfilePage    // GET /users/{username}
     LoginPage / RegisterPage
     ProfilePage        // GET/PATCH /users/me, PATCH /users/me/password
     MyJoinRequestsPage // GET /users/me/join-requests
@@ -837,8 +866,9 @@ Routes and access:
 
 | Route | Access |
 | --- | --- |
-| `/`, `/mangas/:id`, `/mangas/:id/chapters/:chapterId` | public |
-| `/groups`, `/groups/:id` | public |
+| `/`, `/mangas/:slug`, `/mangas/:slug/chapters/:chapterIndex` | public |
+| `/groups`, `/groups/:slug` | public |
+| `/users/:username` | public |
 | `/login`, `/register` | public |
 | `/profile`, `/my/join-requests`, `/groups/request` | authenticated |
 | `/manage/*` (manga/chapter editing) | `TRANSLATOR` (leader for group actions) |
@@ -863,13 +893,16 @@ Routes and access:
    `GET /chapters/{id}/pages` → render images in order; track next/prev chapter.
 3. **Groups:** list → detail (leader, members, translated manga) → "Request to join"
    (authenticated, non-member) → track in `/my/join-requests`.
-4. **Create group:** authenticated non-member submits `POST /creation-requests`; admin
+4. **Public profile:** click a member in a group → `/users/:username`
+   (`GET /users/{username}`) → avatar, bio, contact, join date, current group. Also
+   reachable for yourself from the account menu.
+5. **Create group:** authenticated non-member submits `POST /creation-requests`; admin
    approves/rejects in `/admin/creation-requests`.
-5. **Translate/manage:** a `TRANSLATOR` who is in an active group can create manga
+6. **Translate/manage:** a `TRANSLATOR` who is in an active group can create manga
    (`POST /mangas`), edit it, upload pages and create chapters, and delete chapters.
-6. **Group leader:** approve/reject join requests, kick members, edit group, remove the
+7. **Group leader:** approve/reject join requests, kick members, edit group, remove the
    group from a manga (must keep at least one active group).
-7. **Admin:** manage users, categories, and review group requests; browse all manga and
+8. **Admin:** manage users, categories, and review group requests; browse all manga and
    groups with status filters.
 
 ---

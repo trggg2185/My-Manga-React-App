@@ -5,6 +5,7 @@ import MangaDetailPage from './pages/MangaDetailPage.jsx';
 import ChapterReaderPage from './pages/ChapterReaderPage.jsx';
 import GroupsPage from './pages/GroupsPage.jsx';
 import GroupDetailPage from './pages/GroupDetailPage.jsx';
+import UserProfilePage from './pages/UserProfilePage.jsx';
 import ProfilePage from './pages/ProfilePage.jsx';
 import MyJoinRequestsPage from './pages/MyJoinRequestsPage.jsx';
 import MyMangaPage from './pages/manage/MyMangaPage.jsx';
@@ -25,13 +26,16 @@ import ProtectedRoute from './auth/ProtectedRoute.jsx';
 function App() {
 	return (
 		<Routes>
+			{/* Trình đọc full màn hình, không có header/footer của AppLayout */}
+			<Route path="mangas/:slug/chapters/:chapterIndex" element={<ChapterReaderPage />} />
+
 			<Route element={<AppLayout />}>
 				{/* Công khai */}
 				<Route index element={<HomePage />} />
-				<Route path="mangas/:id" element={<MangaDetailPage />} />
-				<Route path="mangas/:mangaId/chapters/:chapterId" element={<ChapterReaderPage />} />
+				<Route path="mangas/:slug" element={<MangaDetailPage />} />
 				<Route path="groups" element={<GroupsPage />} />
-				<Route path="groups/:id" element={<GroupDetailPage />} />
+				<Route path="groups/:slug" element={<GroupDetailPage />} />
+				<Route path="users/:username" element={<UserProfilePage />} />
 
 				{/* Cần đăng nhập */}
 				<Route element={<ProtectedRoute />}>
@@ -43,9 +47,9 @@ function App() {
 				<Route element={<ProtectedRoute roles={['TRANSLATOR', 'ADMIN']} />}>
 					<Route path="manage" element={<MyMangaPage />} />
 					<Route path="manage/mangas/new" element={<MangaEditorPage />} />
-					<Route path="manage/mangas/:mangaId" element={<MangaEditorPage />} />
-					<Route path="manage/mangas/:mangaId/chapters" element={<ManageMangaPage />} />
-					<Route path="manage/mangas/:mangaId/chapters/new" element={<ChapterEditorPage />} />
+					<Route path="manage/mangas/:slug" element={<MangaEditorPage />} />
+					<Route path="manage/mangas/:slug/chapters" element={<ManageMangaPage />} />
+					<Route path="manage/mangas/:slug/chapters/new" element={<ChapterEditorPage />} />
 				</Route>
 
 				{/* Admin */}

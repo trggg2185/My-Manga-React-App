@@ -1,5 +1,6 @@
 import { Link, useParams } from 'react-router-dom';
-import { mangaApi, chapterApi } from '../api';
+import { mangaApi, chapterApi, ApiError } from '../api';
+import { resolveMangaId } from '../utils/resolveUrl';
 import { useFetch } from '../hooks/useFetch';
 import { MANGA_STATUS_TONE, mangaStatusLabel, formatDate } from '../utils/format';
 import Loading from '../components/common/Loading';
@@ -9,17 +10,19 @@ import Cover from '../components/common/Cover';
 import EmptyState from '../components/common/EmptyState';
 
 function MangaDetailPage() {
-	const { id } = useParams();
+	const { slug } = useParams();
 
 	const { data, error, loading, reload } = useFetch(
 		async () => {
+			const mangaId = await resolveMangaId(slug);
+			if (!mangaId) throw new ApiError('404', 'Không tìm thấy truyện.');
 			const [manga, chapters] = await Promise.all([
-				mangaApi.get(id),
-				chapterApi.listByManga(id, { page: 0, size: 100, sortBy: 'chapterIndex' }),
+				mangaApi.get(mangaId),
+				chapterApi.listByManga(mangaId, { page: 0, size: 100, sortBy: 'chapterIndex' }),
 			]);
 			return { manga, chapters: chapters?.content ?? [] };
 		},
-		[id],
+		[slug],
 	);
 
 	if (loading) return <Loading label="Đang tải truyện..." />;
@@ -72,7 +75,7 @@ function MangaDetailPage() {
 						{manga.transGroups.map((group) => (
 							<Link
 								key={group.id}
-								to={`/groups/${group.id}`}
+								to={`/groups/${group.slug ?? group.id}`}
 								className="group flex items-center gap-3 rounded-2xl border border-white/10 bg-ink-900 p-4 transition-colors duration-200 hover:border-white/25 hover:bg-white/5"
 							>
 								<Cover
@@ -103,7 +106,7 @@ function MangaDetailPage() {
 						{chapters.map((chapter) => (
 							<Link
 								key={chapter.id}
-								to={`/mangas/${id}/chapters/${chapter.id}`}
+								to={`/mangas/${manga.slug ?? slug}/chapters/${chapter.chapterIndex}`}
 								className="flex items-center justify-between px-4 py-3 transition-colors duration-200 hover:bg-white/5"
 							>
 								<span className="text-sm text-neutral-200">

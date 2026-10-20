@@ -1,5 +1,6 @@
 import { Link, useParams } from 'react-router-dom';
-import { chapterApi, mangaApi } from '../../api';
+import { ApiError, chapterApi, mangaApi } from '../../api';
+import { resolveMangaId } from '../../utils/resolveUrl';
 import { useFetch } from '../../hooks/useFetch';
 import { useMutation } from '../../hooks/useMutation';
 import { formatDate } from '../../utils/format';
@@ -10,24 +11,26 @@ import EmptyState from '../../components/common/EmptyState';
 import Button from '../../components/common/Button';
 
 function ManageMangaPage() {
-	const { mangaId } = useParams();
+	const { slug } = useParams();
 	const mutation = useMutation();
 
 	const { data, error, loading, reload } = useFetch(
 		async () => {
+			const mangaId = await resolveMangaId(slug);
+			if (!mangaId) throw new ApiError('404', 'Không tìm thấy truyện.');
 			const [manga, chapters] = await Promise.all([
 				mangaApi.get(mangaId),
 				chapterApi.listByManga(mangaId, { page: 0, size: 200, sortBy: 'chapterIndex' }),
 			]);
-			return { manga, chapters: chapters?.content ?? [] };
+			return { mangaId, manga, chapters: chapters?.content ?? [] };
 		},
-		[mangaId],
+		[slug],
 	);
 
 	if (loading) return <Loading />;
 	if (error) return <ErrorMessage error={error} onRetry={reload} />;
 
-	const { manga, chapters } = data ?? {};
+	const { mangaId, manga, chapters } = data ?? {};
 
 	const handleDeleteChapter = (chapterId) => {
 		if (!window.confirm('Xoá chương này?')) return;
@@ -47,7 +50,7 @@ function ManageMangaPage() {
 				title="Quản lý chương"
 				subtitle={manga?.name}
 				actions={
-					<Link to={`/manage/mangas/${mangaId}/chapters/new`}>
+					<Link to={`/manage/mangas/${slug}/chapters/new`}>
 						<Button>+ Thêm chương</Button>
 					</Link>
 				}

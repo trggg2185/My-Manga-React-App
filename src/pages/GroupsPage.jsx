@@ -56,7 +56,7 @@ function MyGroupSection() {
 					</div>
 				</div>
 				<div className="flex items-center gap-2">
-					<Link to={`/groups/${group.id}`}>
+					<Link to={`/groups/${group.slug ?? group.id}`}>
 						<Button variant="ghost">Xem nhóm</Button>
 					</Link>
 					<Link to="/manage">

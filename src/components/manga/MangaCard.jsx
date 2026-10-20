@@ -49,7 +49,7 @@ export default function MangaCard({ manga, index = 0 }) {
 			onMouseLeave={hideTip}
 		>
 			<Link
-				to={`/mangas/${manga.id}`}
+				to={`/mangas/${manga.slug ?? manga.id}`}
 				className="block overflow-hidden rounded-2xl border border-white/10 bg-ink-900 transition-all duration-300 hover:-translate-y-1 hover:border-white/25 hover:shadow-[0_10px_40px_-10px_rgba(255,255,255,0.15)]"
 			>
 				<div className="relative">

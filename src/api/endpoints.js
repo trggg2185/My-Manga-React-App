@@ -9,6 +9,7 @@ export const ENDPOINTS = {
 	},
 	users: {
 		me: '/users/me',
+		profile: (username) => `/users/${encodeURIComponent(username)}`,
 		mePassword: '/users/me/password',
 		meJoinRequests: '/users/me/join-requests',
 		meCreationRequests: '/users/me/creation-requests',

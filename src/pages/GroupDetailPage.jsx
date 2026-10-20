@@ -1,6 +1,7 @@
 import { useState } from 'react';
-import { useParams } from 'react-router-dom';
+import { Link, useParams } from 'react-router-dom';
 import { groupApi, joinRequestApi } from '../api';
+import { resolveGroupId } from '../utils/resolveUrl';
 import { useFetch } from '../hooks/useFetch';
 import { useMutation } from '../hooks/useMutation';
 import { useCurrentUser } from '../hooks/useCurrentUser';
@@ -18,7 +19,17 @@ import MangaGrid from '../components/manga/MangaGrid';
 import EditGroupModal from '../components/group/EditGroupModal';
 
 function GroupDetailPage() {
-	const { id } = useParams();
+	const { slug } = useParams();
+	const { data: id, error, loading, reload } = useFetch(() => resolveGroupId(slug), [slug]);
+
+	if (loading) return <Loading label="Đang tải nhóm..." />;
+	if (error) return <ErrorMessage error={error} onRetry={reload} />;
+	if (!id) return <ErrorMessage error={{ code: '404', message: 'Không tìm thấy nhóm.' }} />;
+
+	return <GroupDetailContent key={id} id={id} />;
+}
+
+function GroupDetailContent({ id }) {
 	const { isAuthenticated } = useAuth();
 	const { data: me } = useCurrentUser();
 	const { data: mine } = useMyGroup();
@@ -161,11 +172,16 @@ function GroupDetailPage() {
 					<ul className="divide-y divide-white/5 overflow-hidden rounded-2xl border border-white/10 bg-ink-900">
 						{members.map((member) => (
 							<li key={member.id} className="flex items-center justify-between gap-3 px-4 py-3">
-								<span className="flex items-center gap-3">
+								<Link
+									to={`/users/${member.username}`}
+									className="group flex items-center gap-3"
+								>
 									<Avatar src={member.avatar} name={member.username} size={32} />
-									<span className="text-sm text-neutral-200">{member.username}</span>
+									<span className="text-sm text-neutral-200 transition-colors duration-200 group-hover:text-white">
+										{member.username}
+									</span>
 									{member.id === group.leader?.id && <Badge tone="sky">Leader</Badge>}
-								</span>
+								</Link>
 								{isLeader && member.id !== group.leader?.id && (
 									<Button variant="danger" onClick={() => handleKick(member.id)}>
 										Kick

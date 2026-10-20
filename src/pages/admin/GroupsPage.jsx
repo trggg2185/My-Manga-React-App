@@ -50,7 +50,7 @@ function AdminGroupsPage() {
 					{data.content.map((group) => (
 						<li key={group.id} className="flex items-center justify-between px-4 py-3">
 							<Link
-								to={`/groups/${group.id}`}
+								to={`/groups/${group.slug ?? group.id}`}
 								className="text-sm text-neutral-200 transition-colors duration-200 hover:text-white"
 							>
 								{group.name}

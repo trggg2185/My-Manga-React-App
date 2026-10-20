@@ -80,7 +80,7 @@ function MyMangaPage() {
 							<span className="flex items-center gap-3 text-sm text-neutral-200">
 								{isLeader ? (
 									<Link
-										to={`/manage/mangas/${manga.id}`}
+										to={`/manage/mangas/${manga.slug ?? manga.id}`}
 										className="transition-colors duration-200 hover:text-white"
 									>
 										{manga.name}
@@ -95,11 +95,11 @@ function MyMangaPage() {
 									{formatDate(manga.createdAt)}
 								</span>
 								{isLeader && (
-									<Link to={`/manage/mangas/${manga.id}`}>
+									<Link to={`/manage/mangas/${manga.slug ?? manga.id}`}>
 										<Button variant="ghost">Sửa</Button>
 									</Link>
 								)}
-								<Link to={`/manage/mangas/${manga.id}/chapters`}>
+								<Link to={`/manage/mangas/${manga.slug ?? manga.id}/chapters`}>
 									<Button variant="ghost">Chương</Button>
 								</Link>
 								{isLeader && (

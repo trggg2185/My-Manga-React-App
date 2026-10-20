@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { categoryApi, mangaApi } from '../../api';
+import { resolveMangaId } from '../../utils/resolveUrl';
 import { useFetch } from '../../hooks/useFetch';
 import { useMutation } from '../../hooks/useMutation';
 import { MANGA_STATUS } from '../../utils/format';
@@ -16,14 +17,19 @@ import ImageUploadField from '../../components/common/ImageUploadField';
 const STATUS_OPTIONS = Object.entries(MANGA_STATUS).map(([value, label]) => ({ value, label }));
 
 function MangaEditorPage() {
-	const { mangaId } = useParams();
+	const { slug } = useParams();
 	const navigate = useNavigate();
-	const isEdit = Boolean(mangaId);
+	const isEdit = Boolean(slug);
 
 	const { data: categories } = useFetch(() => categoryApi.list(), []);
+	const resolved = useFetch(
+		() => (isEdit ? resolveMangaId(slug) : Promise.resolve(null)),
+		[slug],
+	);
+	const mangaId = resolved.data;
 	// Sửa truyện phải dùng endpoint riêng cho leader (spec §7.4).
 	const { data: manga, loading, error } = useFetch(
-		() => (isEdit ? mangaApi.getManagement(mangaId) : Promise.resolve(null)),
+		() => (mangaId ? mangaApi.getManagement(mangaId) : Promise.resolve(null)),
 		[mangaId],
 	);
 
@@ -50,8 +56,13 @@ function MangaEditorPage() {
 		});
 	}, [manga]);
 
-	if (isEdit && loading) return <Loading />;
+	if (isEdit && resolved.loading) return <Loading />;
+	if (isEdit && resolved.error) return <ErrorMessage error={resolved.error} onRetry={resolved.reload} />;
+	if (isEdit && !mangaId) {
+		return <ErrorMessage error={{ code: '404', message: 'Không tìm thấy truyện.' }} />;
+	}
 	if (isEdit && error) return <ErrorMessage error={error} />;
+	if (isEdit && (!manga || loading)) return <Loading />;
 
 	const toggleCategory = (id) =>
 		setForm((f) => ({
@@ -112,7 +123,7 @@ function MangaEditorPage() {
 				subtitle={isEdit ? 'Cập nhật thông tin truyện' : undefined}
 				actions={
 					isEdit && (
-						<Link to={`/manage/mangas/${mangaId}/chapters`}>
+						<Link to={`/manage/mangas/${slug}/chapters`}>
 							<Button variant="ghost">Quản lý chương</Button>
 						</Link>
 					)

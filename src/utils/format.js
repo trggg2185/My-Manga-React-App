@@ -5,9 +5,9 @@ export const MANGA_STATUS = {
 };
 
 export const MANGA_STATUS_TONE = {
-	COMPLETED: 'sky',
-	ONGOING: 'green',
-	ONHOLD: 'amber',
+	COMPLETED: 'green',
+	ONGOING: 'blue',
+	ONHOLD: 'red',
 };
 
 export const TRANS_GROUP_STATUS = {

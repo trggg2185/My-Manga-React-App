@@ -50,7 +50,7 @@ function AdminMangaPage() {
 					{data.content.map((manga) => (
 						<li key={manga.id} className="flex items-center justify-between gap-3 px-4 py-3">
 							<Link
-								to={`/mangas/${manga.id}`}
+								to={`/mangas/${manga.slug ?? manga.id}`}
 								className="text-sm text-neutral-200 transition-colors duration-200 hover:text-white"
 							>
 								{manga.name}

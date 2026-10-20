@@ -50,6 +50,15 @@ function AccountMenu() {
 					<Link to="/profile" className={menuItemClass} onClick={() => setOpen(false)}>
 						Chỉnh sửa thông tin cá nhân
 					</Link>
+					{me?.username && (
+						<Link
+							to={`/users/${me.username}`}
+							className={menuItemClass}
+							onClick={() => setOpen(false)}
+						>
+							Trang cá nhân
+						</Link>
+					)}
 					<button
 						type="button"
 						className={`${menuItemClass} text-red-300 hover:bg-red-500/10`}

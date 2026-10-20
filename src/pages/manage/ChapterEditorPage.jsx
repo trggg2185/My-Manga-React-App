@@ -1,13 +1,14 @@
 import { useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { chapterApi, uploadApi } from '../../api';
+import { chapterApi, uploadApi, ApiError } from '../../api';
+import { resolveMangaId } from '../../utils/resolveUrl';
 import { useMutation } from '../../hooks/useMutation';
 import PageHeader from '../../components/common/PageHeader';
 import Button from '../../components/common/Button';
 import Input from '../../components/common/Input';
 
 function ChapterEditorPage() {
-	const { mangaId } = useParams();
+	const { slug } = useParams();
 	const navigate = useNavigate();
 	const [chapterIndex, setChapterIndex] = useState('');
 	const [title, setTitle] = useState('');
@@ -66,12 +67,14 @@ function ChapterEditorPage() {
 	const submit = (e) => {
 		e.preventDefault();
 		mutation.run(async () => {
+			const mangaId = await resolveMangaId(slug);
+			if (!mangaId) throw new ApiError('404', 'Không tìm thấy truyện.');
 			await chapterApi.create(mangaId, {
 				chapterIndex: Number(chapterIndex),
 				title,
 				pageUrls: uploaded.map((page) => page.url),
 			});
-			navigate(`/manage/mangas/${mangaId}/chapters`);
+			navigate(`/manage/mangas/${slug}/chapters`);
 		});
 	};
 

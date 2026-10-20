@@ -53,6 +53,16 @@
  * @property {string} username
  * @property {string|null} avatar
  *
+ * @typedef {Object} PublicUserProfileResponse
+ * @property {string} id
+ * @property {string} username
+ * @property {string|null} avatar
+ * @property {string|null} bio
+ * @property {string|null} facebook
+ * @property {string|null} discord
+ * @property {string} createdAt
+ * @property {TransGroupSummaryResponse|null} transGroup nhóm APPROVED (member hoặc leader)
+ *
  * @typedef {Object} UserResponse
  * @property {string} id
  * @property {string} username

@@ -4,7 +4,7 @@ import Cover from '../common/Cover';
 export default function GroupCard({ group, index = 0 }) {
 	return (
 		<Link
-			to={`/groups/${group.id}`}
+			to={`/groups/${group.slug ?? group.id}`}
 			className="group animate-fade-up rounded-2xl border border-white/10 bg-ink-900 p-5 transition-all duration-300 hover:-translate-y-1 hover:border-white/25 hover:shadow-[0_10px_40px_-10px_rgba(255,255,255,0.15)]"
 			style={{ animationDelay: `${Math.min(index, 12) * 40}ms` }}
 		>
