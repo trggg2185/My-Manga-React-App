@@ -245,10 +245,10 @@ function ChapterReaderPage() {
 							to={`/users/${me.username}`}
 							className="mb-5 flex items-center gap-3 rounded-xl border border-white/10 bg-white/5 p-3 transition-colors duration-200 hover:border-white/25 hover:bg-white/10"
 						>
-							<Avatar src={me.avatar} name={me.username} size={36} />
+							<Avatar src={me.avatar} name={me.displayName || me.username} size={36} />
 							<span className="min-w-0">
 								<span className="block truncate text-sm font-medium text-white">
-									{me.username}
+									{me.displayName || me.username}
 								</span>
 								<span className="block text-xs text-neutral-500">Trang cá nhân</span>
 							</span>

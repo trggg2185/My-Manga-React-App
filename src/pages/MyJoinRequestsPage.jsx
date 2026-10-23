@@ -58,7 +58,7 @@ function JoinRequestsSection() {
 				<ul className="divide-y divide-white/5 overflow-hidden rounded-2xl border border-white/10 bg-ink-900">
 					{data.map((request) => (
 						<li key={request.id} className="flex items-center justify-between px-4 py-3">
-							<span className="text-sm text-neutral-200">{request.transGroupName}</span>
+							<span className="text-sm text-neutral-200">{request.transGroup?.name ?? '—'}</span>
 							<Badge tone={JOIN_REQUEST_TONE[request.status]}>
 								{JOIN_REQUEST_STATUS[request.status]}
 							</Badge>

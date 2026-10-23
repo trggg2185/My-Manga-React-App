@@ -477,7 +477,7 @@ interface MangaResponse {            // public manga list item
   status: MangaStatus;
   description: string | null;
   categories: CategoryResponse[];
-  transGroupsId: TransGroupSummaryResponse[]; // NOTE: despite the name, full summary objects
+  transGroups: TransGroupSummaryResponse[];
   updatedAt: string;
 }
 
@@ -492,7 +492,7 @@ interface MangaSummaryResponse {
   createdAt: string;
 }
 
-interface MangaDetailsResponse {     // GET /mangas/{id}; chapters are NOT included
+interface MangaDetailsResponse {     // GET /mangas/{idOrSlug}; chapters are NOT included
   id: string;
   name: string;
   slug: string;
@@ -564,15 +564,16 @@ interface DeleteChapterResponse { mangaId: string; chapterId: string; }
 // ---- TransGroup ----
 interface TransGroupUpdateRequest {
   name?: string;             // 5..50
-  coverImageUrl?: string;    // <=500
   description?: string;      // <=300
+  avatarFile?: File;
+  coverFile?: File;
 }
 
 interface TransGroupSummaryResponse {
   id: string;
   name: string;
   slug: string;
-  coverImageUrl?: string;
+  avatar: string | null;
 }
 
 interface TransGroupResponse {
@@ -580,7 +581,8 @@ interface TransGroupResponse {
   leader: UserSummaryResponse;
   name: string;
   slug: string;
-  coverImageUrl?: string;
+  avatar: string | null;
+  coverImageUrl: string | null;
   status: TransGroupStatus;
   members: UserSummaryResponse[];
   description: string | null;
@@ -627,8 +629,8 @@ interface CreationRequestResponse {
 // ---- Group join request ----
 interface JoinRequestResponse {
   id: string;
-  transGroupName: string | null;
-  username: string | null;
+  transGroup: TransGroupSummaryResponse;
+  user: UserSummaryResponse;
   status: GroupJoinRequestStatus;
   createdAt: string;
   updatedAt: string;
@@ -717,7 +719,7 @@ for role-based UI.
 | Method | Path | Auth | Role | RL | Body | Result |
 | --- | --- | --- | --- | --- | --- | --- |
 | GET | `/mangas` | no | — | `60/60 IP` | query `page=0&size=24&sortBy=createdAt` | `PaginatedResponse<MangaResponse>` |
-| GET | `/mangas/{id}` | no | — | `60/60 IP` | — | `MangaDetailsResponse` |
+| GET | `/mangas/{idOrSlug}` | no | — | `60/60 IP` | — | `MangaDetailsResponse` |
 | GET | `/transgroups/{groupId}/mangas` | no | — | `60/60 IP` | query `page=0&size=15&sortBy=createdAt` | `PaginatedResponse<MangaSummaryResponse>` |
 | POST | `/mangas` | yes | leader | `10/60` | `MangaCreationRequest` | `MangaResponse` |
 | PATCH | `/mangas/{mangaId}` | yes | leader of manga | `10/60` | `MangaUpdateRequest` | `MangaResponse` |
@@ -731,8 +733,9 @@ Behavior notes:
 - `POST /mangas` is executed by the creator's group: the creator must be the leader of
   an `APPROVED` group, which is added automatically. `transGroups` is optional extra
   group IDs (all must be `APPROVED`).
-- Manga detail (`GET /mangas/{id}`) does **not** contain chapters. Fetch them with
-  `/mangas/{mangaId}/chapters`.
+- Manga detail (`GET /mangas/{idOrSlug}`) does **not** contain chapters. Fetch them with
+  `/mangas/{mangaId}/chapters`. The path segment accepts either the UUID or the
+  human-readable unique slug and returns the same `MangaDetailsResponse`.
 - `DELETE /transgroups/{groupId}/mangas/{mangaId}` is "a group leaves a manga"
   (requires the group to still have at least one other active translating group).
 - `PATCH /mangas/{mangaId}` uses `addTransGroups` to add groups; removing a group is a
@@ -770,14 +773,16 @@ Behavior notes:
 | --- | --- | --- | --- | --- | --- | --- |
 | GET | `/users/me/transgroups` | yes | current user | none | — | `TransGroupOfUserResponse` |
 | GET | `/transgroups` | no | — | `60/60 IP` | `page=0&size=20&sortBy=createdAt` | `PaginatedResponse<TransGroupSummaryResponse>` (APPROVED only) |
-| GET | `/transgroups/{id}` | no | — | — | — | `TransGroupDetailsResponse` |
+| GET | `/transgroups/{idOrSlug}` | no | — | `60/60 user/IP` | — | `TransGroupDetailsResponse` |
 | PATCH | `/transgroups/{id}` | yes | group leader or ADMIN | `10/60` | `TransGroupUpdateRequest` | `TransGroupResponse` |
 | DELETE | `/transgroups/{id}` | yes | group leader or ADMIN | `10/60` | — | `DeleteTransGroupResponse` (soft delete → `DELETED`) |
 | GET | `/admin/transgroups` | yes | ADMIN | `30/60` | `status?,page=0,size=20,sortBy=createdAt` | `PaginatedResponse<TransGroupSummaryResponse>` |
 | DELETE | `/transgroups/{groupId}/users/{userId}` | yes | group leader | — | — | `DeleteMemberResponse` (kick member) |
 
-Notes: the public list only returns `APPROVED` groups. `GET /transgroups/{id}` returns
-leader, members, and translated manga regardless of who calls it.
+Notes: the public list only returns `APPROVED` groups. `GET /transgroups/{idOrSlug}`
+returns leader, members, and translated manga regardless of who calls it. The path
+segment accepts either the UUID or the human-readable unique slug. The group details
+DTO has `coverImageUrl` but not `avatar`; the list/summary DTO is the source of `avatar`.
 
 `GET /users/me/transgroups` requires a valid access token and identifies the current
 user's group state. The response has these meanings:
@@ -794,6 +799,10 @@ The backend checks approved membership before approved leadership. Frontend shou
 `status` as the source of truth, treat `transGroup` as optional, and redirect to login
 on an unauthenticated `401` response.
 
+`GET /mangas/{idOrSlug}` and `GET /transgroups/{idOrSlug}` accept either a UUID or a
+slug in the same path segment; the backend detects UUID format internally. No separate
+slug route is required.
+
 ### 7.7 Join requests
 
 | Method | Path | Auth | Role | RL | Result |
@@ -808,6 +817,10 @@ Rules: a user may request a group only if they are not already in (or leading) a
 and only one `PENDING` request per user/group at a time. `status` query filter accepts
 `PENDING | APPROVED | REJECTED`. Approval adds the user to the group and grants the
 `TRANSLATOR` role.
+
+`JoinRequestResponse.transGroup` is a `TransGroupSummaryResponse` (id, name, slug, avatar)
+and `user` is a `UserSummaryResponse`. Match a pending request to a group by
+`transGroup.id`, never by name.
 
 ### 7.8 Group creation requests
 
@@ -945,10 +958,10 @@ src/
     group/             // GroupCard, GroupHeader, MemberList, JoinRequestList
   pages/
     HomePage           // GET /mangas
-    MangaDetailPage    // GET /mangas/{id} + GET /mangas/{mangaId}/chapters
+    MangaDetailPage    // GET /mangas/{idOrSlug} + GET /mangas/{mangaId}/chapters
     ChapterReaderPage  // GET /chapters/{chapterId}/pages
     GroupsPage         // GET /transgroups
-    GroupDetailPage    // GET /transgroups/{id}
+    GroupDetailPage    // GET /transgroups/{idOrSlug}
     UserProfilePage    // GET /users/{username}
     ProfilePage        // GET/PATCH /users/me, PATCH /users/me/password
     MyJoinRequestsPage // GET /users/me/join-requests

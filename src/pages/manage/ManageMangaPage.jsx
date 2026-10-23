@@ -1,6 +1,5 @@
 import { Link, useParams } from 'react-router-dom';
 import { ApiError, chapterApi, mangaApi } from '../../api';
-import { resolveMangaId } from '../../utils/resolveUrl';
 import { useFetch } from '../../hooks/useFetch';
 import { useMutation } from '../../hooks/useMutation';
 import { formatDate } from '../../utils/format';
@@ -16,13 +15,14 @@ function ManageMangaPage() {
 
 	const { data, error, loading, reload } = useFetch(
 		async () => {
-			const mangaId = await resolveMangaId(slug);
-			if (!mangaId) throw new ApiError('404', 'Không tìm thấy truyện.');
-			const [manga, chapters] = await Promise.all([
-				mangaApi.get(mangaId),
-				chapterApi.listByManga(mangaId, { page: 0, size: 200, sortBy: 'chapterIndex' }),
-			]);
-			return { mangaId, manga, chapters: chapters?.content ?? [] };
+			const manga = await mangaApi.get(slug);
+			if (!manga) throw new ApiError('404', 'Không tìm thấy truyện.');
+			const chapters = await chapterApi.listByManga(manga.id, {
+				page: 0,
+				size: 200,
+				sortBy: 'chapterIndex',
+			});
+			return { mangaId: manga.id, manga, chapters: chapters?.content ?? [] };
 		},
 		[slug],
 	);

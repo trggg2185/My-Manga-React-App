@@ -1,6 +1,5 @@
 import { Link, useParams } from 'react-router-dom';
-import { mangaApi, chapterApi, ApiError } from '../api';
-import { resolveMangaId } from '../utils/resolveUrl';
+import { chapterApi, ApiError, mangaApi } from '../api';
 import { useFetch } from '../hooks/useFetch';
 import { MANGA_STATUS_TONE, mangaStatusLabel, formatDate } from '../utils/format';
 import Loading from '../components/common/Loading';
@@ -14,12 +13,13 @@ function MangaDetailPage() {
 
 	const { data, error, loading, reload } = useFetch(
 		async () => {
-			const mangaId = await resolveMangaId(slug);
-			if (!mangaId) throw new ApiError('404', 'Không tìm thấy truyện.');
-			const [manga, chapters] = await Promise.all([
-				mangaApi.get(mangaId),
-				chapterApi.listByManga(mangaId, { page: 0, size: 100, sortBy: 'chapterIndex' }),
-			]);
+			const manga = await mangaApi.get(slug);
+			if (!manga) throw new ApiError('404', 'Không tìm thấy truyện.');
+			const chapters = await chapterApi.listByManga(manga.id, {
+				page: 0,
+				size: 100,
+				sortBy: 'chapterIndex',
+			});
 			return { manga, chapters: chapters?.content ?? [] };
 		},
 		[slug],
@@ -79,7 +79,7 @@ function MangaDetailPage() {
 								className="group flex items-center gap-3 rounded-2xl border border-white/10 bg-ink-900 p-4 transition-colors duration-200 hover:border-white/25 hover:bg-white/5"
 							>
 								<Cover
-									src={group.avatar ?? group.coverImageUrl}
+									src={group.avatar}
 									name={group.name}
 									className="h-11 w-11 shrink-0 rounded-xl"
 									textClass="text-lg"

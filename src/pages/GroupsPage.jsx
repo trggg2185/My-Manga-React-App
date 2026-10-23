@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { groupApi } from '../api';
+import { groupApi, joinRequestApi, userApi } from '../api';
 import { useFetch } from '../hooks/useFetch';
 import { useMyGroup } from '../hooks/useMyGroup';
 import { useAuth } from '../auth/useAuth';
@@ -20,6 +20,37 @@ function MyGroupSection() {
 	const { openAuthModal } = useAuthModal();
 	const [createOpen, setCreateOpen] = useState(false);
 	const { data: mine, error, loading, reload } = useMyGroup();
+	const pending = mine?.status === 'PENDING_REQUEST';
+
+	const {
+		data: pendingJoins,
+		loading: joinsLoading,
+		error: joinsError,
+		reload: reloadJoins,
+	} = useFetch(
+		() =>
+			isAuthenticated && pending
+				? joinRequestApi.listMine({ status: 'PENDING' })
+				: Promise.resolve([]),
+		[isAuthenticated, pending],
+	);
+	const {
+		data: pendingCreations,
+		loading: creationsLoading,
+		error: creationsError,
+		reload: reloadCreations,
+	} = useFetch(
+		() =>
+			isAuthenticated && pending
+				? userApi.getMyCreationRequests({
+						status: 'PENDING',
+						page: 0,
+						size: 20,
+						sortBy: 'createdAt',
+					})
+				: Promise.resolve(null),
+		[isAuthenticated, pending],
+	);
 
 	if (!isAuthenticated) {
 		return (
@@ -43,7 +74,7 @@ function MyGroupSection() {
 			<div className="flex flex-wrap items-center justify-between gap-4 rounded-2xl border border-white/10 bg-ink-900 p-6">
 				<div className="flex items-center gap-4">
 					<Cover
-						src={group.avatar ?? group.coverImageUrl}
+						src={group.avatar}
 						name={group.name}
 						className="h-12 w-12 shrink-0 rounded-xl"
 						textClass="text-lg"
@@ -68,12 +99,60 @@ function MyGroupSection() {
 	}
 
 	if (mine?.status === 'PENDING_REQUEST') {
+		const joins = pendingJoins ?? [];
+		const creations = pendingCreations?.content ?? [];
+
+		if (joinsLoading || creationsLoading) return <Loading label="Đang tải yêu cầu..." />;
+		if (joinsError || creationsError) {
+			return (
+				<ErrorMessage
+					error={joinsError ?? creationsError}
+					onRetry={() => {
+						reloadJoins();
+						reloadCreations();
+					}}
+				/>
+			);
+		}
+		if (pendingJoins === null || pendingCreations === null) {
+			return <Loading label="Đang tải yêu cầu..." />;
+		}
+
 		return (
-			<div className="rounded-2xl border border-amber-500/20 bg-amber-500/5 p-6">
-				<p className="font-medium text-amber-300">Yêu cầu tạo/tham gia nhóm đang chờ duyệt</p>
-				<p className="mt-1 text-sm text-neutral-500">
-					Admin sẽ xem xét yêu cầu của bạn. Bạn sẽ là leader khi nhóm được duyệt.
-				</p>
+			<div className="space-y-3">
+				{joins.length > 0 && (
+					<div className="rounded-2xl border border-amber-500/20 bg-amber-500/5 p-6">
+						<p className="font-medium text-amber-300">
+							Yêu cầu tham gia nhóm đang chờ duyệt
+						</p>
+						<p className="mt-1 text-sm text-neutral-400">
+							Nhóm: {joins.map((request) => request.transGroup?.name).filter(Boolean).join(', ')}
+						</p>
+						<p className="mt-1 text-sm text-neutral-500">
+							Leader của nhóm sẽ xem xét yêu cầu của bạn.
+						</p>
+					</div>
+				)}
+
+				{creations.length > 0 && (
+					<div className="rounded-2xl border border-sky-500/20 bg-sky-500/5 p-6">
+						<p className="font-medium text-sky-300">Yêu cầu tạo nhóm đang chờ duyệt</p>
+						<p className="mt-1 text-sm text-neutral-400">
+							Nhóm: {creations.map((request) => request.groupName).join(', ')}
+						</p>
+						<p className="mt-1 text-sm text-neutral-500">
+							Admin sẽ xem xét yêu cầu của bạn. Bạn sẽ là leader khi nhóm được duyệt.
+						</p>
+					</div>
+				)}
+
+				{joins.length === 0 && creations.length === 0 && (
+					<div className="rounded-2xl border border-white/10 bg-ink-900 p-6">
+						<p className="text-sm text-neutral-400">
+							Không tìm thấy chi tiết yêu cầu đang chờ duyệt.
+						</p>
+					</div>
+				)}
 			</div>
 		);
 	}

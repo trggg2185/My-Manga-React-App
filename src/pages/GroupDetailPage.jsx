@@ -1,7 +1,6 @@
 import { useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { groupApi, joinRequestApi } from '../api';
-import { resolveGroupId } from '../utils/resolveUrl';
 import { useFetch } from '../hooks/useFetch';
 import { useMutation } from '../hooks/useMutation';
 import { useCurrentUser } from '../hooks/useCurrentUser';
@@ -20,51 +19,68 @@ import EditGroupModal from '../components/group/EditGroupModal';
 
 function GroupDetailPage() {
 	const { slug } = useParams();
-	const { data: id, error, loading, reload } = useFetch(() => resolveGroupId(slug), [slug]);
+	const { data, error, loading, reload } = useFetch(async () => {
+		const [group, list] = await Promise.all([
+			groupApi.get(slug),
+			groupApi.list({ page: 0, size: 100, sortBy: 'createdAt' }).catch(() => null),
+		]);
+		if (!group) return null;
+		const summary = (list?.content ?? []).find((item) => item.id === group.id);
+		return {
+			group,
+			avatar: summary?.avatar ?? group.coverImageUrl ?? null,
+		};
+	}, [slug]);
 
 	if (loading) return <Loading label="Đang tải nhóm..." />;
 	if (error) return <ErrorMessage error={error} onRetry={reload} />;
-	if (!id) return <ErrorMessage error={{ code: '404', message: 'Không tìm thấy nhóm.' }} />;
+	if (!data) return <ErrorMessage error={{ code: '404', message: 'Không tìm thấy nhóm.' }} />;
 
-	return <GroupDetailContent key={id} id={id} />;
+	return (
+		<GroupDetailContent
+			key={data.group.id}
+			group={data.group}
+			avatar={data.avatar}
+			reloadGroup={reload}
+		/>
+	);
 }
 
-function GroupDetailContent({ id }) {
+function GroupDetailContent({ group, avatar, reloadGroup }) {
 	const { isAuthenticated } = useAuth();
 	const { data: me } = useCurrentUser();
-	const { data: mine } = useMyGroup();
+	const { data: mine, reload: reloadMine } = useMyGroup();
 	const myGroupStatus = mine?.status;
 	const [editing, setEditing] = useState(false);
 	const [tab, setTab] = useState('mangas');
+	const [requestedBy, setRequestedBy] = useState(null);
+	const id = group.id;
 
-	// Chi tiết nhóm không có avatar -> ghép avatar từ danh sách nhóm (summary).
-	const { data, error, loading, reload } = useFetch(async () => {
-		const [group, list] = await Promise.all([
-			groupApi.get(id),
-			groupApi.list({ page: 0, size: 100, sortBy: 'createdAt' }).catch(() => null),
-		]);
-		const summary = (list?.content ?? []).find((item) => item.id === id);
-		return { group, avatar: summary?.avatar ?? summary?.coverImageUrl ?? null };
-	}, [id]);
-
-	const group = data?.group;
-	const avatar = data?.avatar;
-
-	const isLeader = Boolean(me && group && me.id === group.leader?.id);
-	const isMember = Boolean(me && group?.members?.some((member) => member.id === me.id));
+	const isLeader = Boolean(me && me.id === group.leader?.id);
+	const isMember = Boolean(me && group.members?.some((member) => member.id === me.id));
+	const joinRequested = Boolean(me?.id) && requestedBy === me.id;
 
 	const { data: joinRequests, reload: reloadRequests } = useFetch(
 		() => (isLeader ? joinRequestApi.listByGroup(id, { status: 'PENDING' }) : Promise.resolve([])),
 		[id, isLeader],
 	);
 
+	// JoinRequestResponse trả transGroup summary, so khớp chính xác theo id.
+	const { data: myPendingJoins } = useFetch(
+		() =>
+			isAuthenticated && myGroupStatus === 'PENDING_REQUEST'
+				? joinRequestApi.listMine({ status: 'PENDING' })
+				: Promise.resolve([]),
+		[isAuthenticated, myGroupStatus, id],
+	);
+	const hasPendingJoin = (myPendingJoins ?? []).some(
+		(request) => request.transGroup?.id === id,
+	);
+	const pendingRequest = joinRequested || hasPendingJoin;
+
 	const joinMutation = useMutation();
 	const groupMutation = useMutation();
 	const requestMutation = useMutation();
-
-	if (loading) return <Loading label="Đang tải nhóm..." />;
-	if (error) return <ErrorMessage error={error} onRetry={reload} />;
-	if (!group) return null;
 
 	// Leader luôn đứng đầu danh sách thành viên.
 	const members = [];
@@ -73,12 +89,17 @@ function GroupDetailContent({ id }) {
 		if (member.id !== group.leader?.id) members.push(member);
 	});
 
-	const handleJoin = () => joinMutation.run(() => joinRequestApi.create(id), 'Đã gửi yêu cầu tham gia.');
+	const handleJoin = () =>
+		joinMutation.run(async () => {
+			await joinRequestApi.create(id);
+			setRequestedBy(me?.id ?? null);
+			reloadMine();
+		}, 'Đã gửi yêu cầu tham gia.');
 
 	const handleKick = (memberId) =>
 		groupMutation.run(async () => {
 			await groupApi.kickMember(id, memberId);
-			reload();
+			reloadGroup();
 		}, 'Đã mời thành viên ra khỏi nhóm.');
 
 	const handleRequest = (requestId, action) =>
@@ -86,7 +107,7 @@ function GroupDetailContent({ id }) {
 			if (action === 'approve') await joinRequestApi.approve(id, requestId);
 			else await joinRequestApi.reject(id, requestId);
 			reloadRequests();
-			reload();
+			reloadGroup();
 		}, action === 'approve' ? 'Đã duyệt yêu cầu.' : 'Đã từ chối yêu cầu.');
 
 	const tabs = [
@@ -122,7 +143,10 @@ function GroupDetailContent({ id }) {
 							Chỉnh sửa
 						</Button>
 					)}
-					{!isLeader && isAuthenticated && !isMember && myGroupStatus === 'NONE' && (
+					{!isLeader && isAuthenticated && !isMember && pendingRequest && (
+						<Badge tone="amber">Chờ duyệt</Badge>
+					)}
+					{!isLeader && isAuthenticated && !isMember && !pendingRequest && myGroupStatus === 'NONE' && (
 						<Button onClick={handleJoin} disabled={joinMutation.loading}>
 							Xin tham gia
 						</Button>
@@ -176,11 +200,17 @@ function GroupDetailContent({ id }) {
 									to={`/users/${member.username}`}
 									className="group flex items-center gap-3"
 								>
-									<Avatar src={member.avatar} name={member.username} size={32} />
+									<Avatar
+										src={member.avatar}
+										name={member.displayName || member.username}
+										size={32}
+									/>
 									<span className="text-sm text-neutral-200 transition-colors duration-200 group-hover:text-white">
-										{member.username}
+										{member.displayName || member.username}
 									</span>
-									{member.id === group.leader?.id && <Badge tone="sky">Leader</Badge>}
+									<Badge tone={member.id === group.leader?.id ? 'blue' : 'neutral'}>
+										{member.id === group.leader?.id ? 'Leader' : 'Thành viên'}
+									</Badge>
 								</Link>
 								{isLeader && member.id !== group.leader?.id && (
 									<Button variant="danger" onClick={() => handleKick(member.id)}>
@@ -200,7 +230,7 @@ function GroupDetailContent({ id }) {
 					onClose={() => setEditing(false)}
 					onSaved={() => {
 						setEditing(false);
-						reload();
+						reloadGroup();
 					}}
 				/>
 			)}
@@ -218,7 +248,9 @@ function GroupDetailContent({ id }) {
 							{joinRequests.map((request) => (
 								<li key={request.id} className="flex items-center justify-between gap-3 px-4 py-3">
 									<span className="flex items-center gap-3 text-sm text-neutral-200">
-										{request.username}
+										{request.user?.displayName ||
+											request.user?.username ||
+											'Người dùng'}
 										<Badge tone={JOIN_REQUEST_TONE[request.status]}>
 											{JOIN_REQUEST_STATUS[request.status]}
 										</Badge>

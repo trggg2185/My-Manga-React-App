@@ -8,8 +8,9 @@ export const mangaApi = {
 		rememberMangas(data?.content);
 		return data;
 	},
-	get: async (id) => {
-		const manga = await axiosClient.get(ENDPOINTS.manga.detail(id));
+	// GET /mangas/{idOrSlug} — backend nhận cả UUID và slug.
+	get: async (idOrSlug) => {
+		const manga = await axiosClient.get(ENDPOINTS.manga.detail(idOrSlug));
 		rememberMangas([manga]);
 		return manga;
 	},

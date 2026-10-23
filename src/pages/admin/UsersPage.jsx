@@ -113,7 +113,9 @@ function UsersPage() {
 					<ul className="divide-y divide-white/5 overflow-hidden rounded-2xl border border-white/10 bg-ink-900">
 						{data.content.map((user) => (
 							<li key={user.id} className="flex items-center justify-between px-4 py-3">
-								<span className="text-sm text-neutral-200">{user.username}</span>
+								<span className="text-sm text-neutral-200">
+									{user.displayName || user.username}
+								</span>
 								<Button variant="danger" onClick={() => handleDelete(user.id)}>
 									Xoá
 								</Button>

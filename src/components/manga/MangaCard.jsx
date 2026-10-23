@@ -11,8 +11,8 @@ const TIP_GAP = 8;
 export default function MangaCard({ manga, index = 0 }) {
 	const [tip, setTip] = useState(null);
 	const categories = manga.categories ?? [];
-	// Backend trả field `transGroups`; spec cũ ghi `transGroupsId`.
-	const groups = manga.transGroups ?? manga.transGroupsId ?? [];
+	// Backend trả field `transGroups`.
+	const groups = manga.transGroups ?? [];
 
 	// Chọn bên phải/trái theo khoảng trống còn lại để tooltip không tràn ra ngoài màn hình.
 	const showTip = (e) => {

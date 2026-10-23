@@ -21,7 +21,7 @@ export const ENDPOINTS = {
 	},
 	manga: {
 		list: '/mangas',
-		detail: (id) => `/mangas/${id}`,
+		detail: (idOrSlug) => `/mangas/${encodeURIComponent(idOrSlug)}`,
 		management: (mangaId) => `/mangas/${mangaId}/management`,
 		create: '/mangas',
 		update: (mangaId) => `/mangas/${mangaId}`,
@@ -40,7 +40,7 @@ export const ENDPOINTS = {
 	transGroups: {
 		mine: '/users/me/transgroups',
 		list: '/transgroups',
-		detail: (id) => `/transgroups/${id}`,
+		detail: (idOrSlug) => `/transgroups/${encodeURIComponent(idOrSlug)}`,
 		update: (id) => `/transgroups/${id}`,
 		remove: (id) => `/transgroups/${id}`,
 		kickMember: (groupId, userId) => `/transgroups/${groupId}/users/${userId}`,

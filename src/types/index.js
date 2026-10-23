@@ -126,7 +126,7 @@
  * @property {MangaStatus} status
  * @property {string|null} description
  * @property {CategoryResponse[]} categories
- * @property {TransGroupSummaryResponse[]} transGroupsId (thực chất là object summary)
+ * @property {TransGroupSummaryResponse[]} transGroups
  * @property {string} updatedAt
  *
  * @typedef {Object} MangaSummaryResponse
@@ -200,19 +200,21 @@
  * @property {string} id
  * @property {string} name
  * @property {string} slug
- * @property {string} [coverImageUrl]
- * @property {string} [avatar] backend hiện trả field này ở summary
+ * @property {string|null} avatar
  *
  * @typedef {Object} TransGroupUpdateRequest
  * @property {string} [name] 5..50
- * @property {string} [coverImageUrl] <=500
  * @property {string} [description] <=300
+ * @property {File} [avatarFile]
+ * @property {File} [coverFile]
  *
  * @typedef {Object} TransGroupResponse
  * @property {string} id
  * @property {UserSummaryResponse} leader
  * @property {string} name
  * @property {string} slug
+ * @property {string|null} avatar
+ * @property {string|null} coverImageUrl
  * @property {TransGroupStatus} status
  * @property {UserSummaryResponse[]} members
  * @property {string|null} description
@@ -223,6 +225,7 @@
  * @property {UserSummaryResponse} leader
  * @property {string} name
  * @property {string} slug
+ * @property {string|null} coverImageUrl
  * @property {TransGroupStatus} status
  * @property {MangaSummaryResponse[]} translatedMangas
  * @property {UserSummaryResponse[]} members
@@ -249,8 +252,8 @@
  *
  * @typedef {Object} JoinRequestResponse
  * @property {string} id
- * @property {string|null} transGroupName
- * @property {string|null} username
+ * @property {TransGroupSummaryResponse} transGroup
+ * @property {UserSummaryResponse} user
  * @property {GroupJoinRequestStatus} status
  * @property {string} createdAt
  * @property {string} updatedAt
