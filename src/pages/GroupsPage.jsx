@@ -25,7 +25,7 @@ function MyGroupSection() {
 		return (
 			<div className="rounded-2xl border border-white/10 bg-ink-900 p-6">
 				<p className="text-sm text-neutral-400">Đăng nhập để tạo và quản lý nhóm dịch của bạn.</p>
-				<Button className="mt-4" onClick={() => openAuthModal('login')}>
+				<Button className="mt-4" onClick={openAuthModal}>
 					Đăng nhập
 				</Button>
 			</div>

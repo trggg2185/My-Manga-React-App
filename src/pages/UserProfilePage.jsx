@@ -49,6 +49,7 @@ function UserProfilePage() {
 
 	const isSelf = me?.username?.toLowerCase() === user.username?.toLowerCase();
 	const group = user.transGroup;
+	const displayName = user.displayName?.trim() || user.username;
 
 	return (
 		<article className="animate-fade-up">
@@ -65,9 +66,12 @@ function UserProfilePage() {
 
 			<section className="rounded-2xl border border-white/10 bg-ink-900 p-6">
 				<div className="flex flex-col items-center gap-4 text-center sm:flex-row sm:items-start sm:text-left">
-					<Avatar src={user.avatar} name={user.username} size={96} />
+					<Avatar src={user.avatar} name={displayName} size={96} />
 					<div className="min-w-0">
-						<h2 className="text-2xl font-bold text-white">{user.username}</h2>
+						<h2 className="text-2xl font-bold text-white">{displayName}</h2>
+						{displayName !== user.username && (
+							<p className="mt-1 text-sm text-neutral-500">@{user.username}</p>
+						)}
 						<p className="mt-1 text-sm text-neutral-500">
 							Tham gia {formatDate(user.createdAt)}
 						</p>

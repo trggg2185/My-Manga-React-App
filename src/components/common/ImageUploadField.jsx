@@ -33,7 +33,7 @@ export default function ImageUploadField({ label = 'Ảnh bìa', value, onChange
 		<div>
 			<span className="mb-1.5 block text-sm text-neutral-400">{label}</span>
 			<div className="flex items-center gap-4">
-				<div className="flex h-24 w-16 items-center justify-center overflow-hidden rounded-lg border border-white/10 bg-ink-800">
+				<div className="flex h-60 w-40 items-center justify-center overflow-hidden rounded-lg border border-white/10 bg-ink-800">
 					{shown ? (
 						<img src={shown} alt="Ảnh bìa" className="h-full w-full object-cover" />
 					) : (

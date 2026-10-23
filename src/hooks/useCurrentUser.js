@@ -40,20 +40,22 @@ function fetchMe() {
 
 /** GET /users/me — thông tin user hiện tại, dùng chung cho header và các trang. */
 export function useCurrentUser() {
-	const { isAuthenticated } = useAuth();
+	const { token } = useAuth();
 	const snapshot = useSyncExternalStore(subscribe, () => state);
 
 	useEffect(() => {
-		if (isAuthenticated) fetchMe().catch(() => {});
+		// Phụ thuộc token (không chỉ isAuthenticated) để luôn lấy lại user sau khi đăng nhập lại.
+		if (token) fetchMe().catch(() => {});
 		else emit({ data: null, error: null, loading: false });
-	}, [isAuthenticated]);
+	}, [token]);
 
 	const reload = useCallback(() => fetchMe().catch(() => {}), []);
+	const authenticated = Boolean(token);
 
 	return {
-		data: isAuthenticated ? snapshot.data : null,
-		error: isAuthenticated ? snapshot.error : null,
-		loading: isAuthenticated && snapshot.loading,
+		data: authenticated ? snapshot.data : null,
+		error: authenticated ? snapshot.error : null,
+		loading: authenticated && snapshot.loading,
 		reload,
 	};
 }

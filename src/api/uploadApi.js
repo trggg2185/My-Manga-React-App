@@ -11,9 +11,13 @@ export const uploadApi = {
 		form.append('file', file);
 		return axiosClient.post(ENDPOINTS.files.upload, form, { ...multipart(), timeout: UPLOAD_TIMEOUT });
 	},
-	uploadMulti: (files) => {
+	uploadMulti: (files, onUploadProgress) => {
 		const form = new FormData();
 		files.forEach((file) => form.append('files', file));
-		return axiosClient.post(ENDPOINTS.files.uploadMulti, form, { ...multipart(), timeout: UPLOAD_TIMEOUT });
+		return axiosClient.post(ENDPOINTS.files.uploadMulti, form, {
+			...multipart(),
+			timeout: UPLOAD_TIMEOUT,
+			onUploadProgress,
+		});
 	},
 };

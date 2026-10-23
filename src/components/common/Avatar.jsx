@@ -1,13 +1,18 @@
-// Hiển thị ảnh đại diện; nếu chưa có ảnh thì dùng chữ cái đầu của tên.
+import { useState } from 'react';
+
+// Hiển thị ảnh đại diện; nếu ảnh lỗi hoặc chưa có thì dùng chữ cái đầu của tên.
 export default function Avatar({ src, name, size = 36, className = '' }) {
+	const [failedSrc, setFailedSrc] = useState(null);
 	const style = { width: size, height: size };
 
-	if (src) {
+	if (src && failedSrc !== src) {
 		return (
 			<img
 				src={src}
 				alt={name ?? 'avatar'}
 				style={style}
+				referrerPolicy="no-referrer"
+				onError={() => setFailedSrc(src)}
 				className={`shrink-0 rounded-full border border-white/15 object-cover ${className}`}
 			/>
 		);

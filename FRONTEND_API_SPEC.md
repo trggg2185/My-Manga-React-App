@@ -56,64 +56,149 @@ VITE_API_BASE_URL=http://localhost:8080/mymangaapp
 
 ## 3. Authentication
 
-The API is stateless. Authentication uses one HS512 JWT access token.
+The API is stateless. The current authentication flow is social-login only. There is no
+username/password login endpoint and no username/password registration endpoint.
+Currently only Google verification is implemented by the backend.
 
-### Login
+### Frontend environment: Google Client ID
 
-`POST /auth/login` with `{ "username", "password" }` returns:
+Do not hardcode the Google Client ID in React source. Read it from the frontend
+environment:
 
-```json
-{ "code": "0000", "result": { "authenticated": true, "token": "<jwt>" } }
+```env
+VITE_GOOGLE_CLIENT_ID=<same value as backend GOOGLE_CLIENT_ID>
 ```
 
-There is no separate refresh token: the same access token is used to refresh while it
-is still within the refreshable window.
+The backend reads its Google OAuth audience from the process environment variable
+`GOOGLE_CLIENT_ID`, mapped by `application.yaml` to `app.auth.google.client-id`.
+`GOOGLE_CLIENT_ID` is an identifier, not a secret, but it should still be configured
+through environment files/configuration rather than duplicated in application code.
+The frontend Google Sign-In component must use `VITE_GOOGLE_CLIENT_ID` and pass the
+returned Google **ID token** (not an access token and not the user's email) to the
+backend as `credential`.
+
+### Google login and automatic registration
+
+The Google endpoint performs both login and registration:
+
+```http
+POST /auth/social/google
+Content-Type: application/json
+```
+
+```json
+{ "credential": "<google-id-token>" }
+```
+
+The effective route is `/auth/social/{provider}`. `provider` is case-insensitive and the
+supported enum values are `google`, `facebook`, and `discord`, but only `google` has a
+verifier bean at present; use Google.
+
+On the first successful Google login, the backend automatically creates a local user
+and links the Google identity by Google's immutable `sub`. On later logins, the same
+Google identity resolves to the existing user. A verified Google email may be saved
+as the local email; the backend rejects creation if that email is already owned by a
+different login method.
+
+Success response:
+
+```json
+{
+  "code": "0000",
+  "result": {
+    "authenticated": true,
+    "token": "<access-token>",
+    "expiresIn": 900
+  }
+}
+```
+
+The Google ID token is only sent to the backend for verification. Do not send it as
+the application's bearer token.
 
 ### Using the token
 
 Send it on every protected request:
 
 ```http
-Authorization: Bearer <jwt>
+Authorization: Bearer <access-token>
 ```
+
+Every frontend request must include cookies:
+
+```ts
+fetch(url, {
+  credentials: 'include',
+  headers: { Authorization: 'Bearer ' + accessToken },
+});
+```
+
+For Axios, configure the client with `withCredentials: true`. This applies to public
+API requests, protected requests, and every `/auth/*` request. The browser sends the
+HttpOnly refresh-token cookie automatically when the request is made to the API.
 
 ### Token contents (client-side decoding)
 
 The JWT payload is standard base64url and contains:
 
-- `sub` — username
+- `sub` — local user ID
 - `jti` — token id (invalidated on logout/refresh)
 - `scope` — space-separated role names, e.g. `"ADMIN"` or `"USER TRANSLATOR"`
 - `iss` — `trg2k5.com`
 - `iat`, `exp`
 
-Recommendation: store the token in `localStorage` (or memory + localStorage),
-attach it in a single axios/fetch interceptor, and decode `scope` + `exp` client-side
-to drive role-based UI and to know when to refresh.
+Keep the access token only in application memory (React context/store/module variable).
+Never store it in `localStorage`, `sessionStorage`, IndexedDB, URLs, or persisted state.
+The refresh token is an HttpOnly cookie and must never be read by JavaScript. Decode
+`scope` and `exp` client-side, and use `expiresIn` to schedule a refresh slightly before
+expiry.
 
-### Refresh and logout
+### Refresh, logout, and introspection
 
-- `POST /auth/refresh` with `{ "token": "<current token>" }` → invalidates the old
-  token and returns a new `{ authenticated, token }`.
-- `POST /auth/logout` with `{ "token": "<current token>" }` → invalidates the token.
+- `POST /auth/refresh` with no JSON body; the browser sends the refresh cookie → returns
+  a new access token and may set a rotated refresh cookie.
+- `POST /auth/logout` with no JSON body; the browser sends the refresh cookie and the
+  current access token is read from the `Authorization` header → revokes the session
+  and clears the cookie.
 - `POST /auth/introspect` with `{ "token" }` → `{ "valid": true | false }`.
 
-Recommended token lifecycle on the client:
+### Required token lifecycle
 
-1. On login, store `token`.
-2. Before `exp` (or on a `401`/`1001`), call `/auth/refresh` with the current token and
-   replace it.
-3. If refresh also fails (`UNAUTHENTICATED`), clear the token and redirect to login.
+1. On application startup/page load, call `POST /auth/refresh` first with
+   `credentials: 'include'`. If the refresh cookie is valid, keep the user signed in
+   and store the returned access token only in memory.
+2. After social login, store only the returned access token in memory. The refresh
+   cookie is set by the response and is not manually processed.
+3. Use `expiresIn` to schedule refresh slightly before expiry (for example 30–60
+   seconds early, never after the token has expired).
+4. If any API request returns `401`, start one refresh attempt and retry the original
+   request once with the new access token.
+5. If several requests return `401` concurrently, all of them must await the same
+   in-flight refresh promise. Do not send multiple refresh requests.
+6. If that shared refresh returns `401` or fails authentication, clear the in-memory
+   access token and user state, stop retrying, and open the login modal.
+7. Mark a retried request so it cannot recursively refresh forever. Never retry
+   `/auth/refresh` itself through the same 401 interceptor.
 
-### Auth response DTO
+### Auth request/response DTOs
 
 ```jsonc
+// Social AuthRequest
+{ "credential": "<google-id-token>" }
+
 // AuthenticationResponse
-{ "authenticated": true, "token": "..." }
+{ "authenticated": true, "token": "...", "expiresIn": 900 }
+
+// RefreshRequest / LogoutRequest
+// no JSON body; refresh/logout use the browser cookie and Authorization header
 
 // IntrospectResponse
 { "valid": true }
 ```
+
+`credential` and introspection `token` are required non-blank strings. Never log or
+expose Google ID tokens, access tokens, or refresh cookies in UI telemetry, URLs, query
+parameters, analytics events, or error messages.
 
 ---
 
@@ -151,7 +236,9 @@ Use `code` (not the HTTP status) for messages and special handling. Common codes
 | --- | --- | --- |
 | `0000` | Success | 200 |
 | `1001` | Unauthenticated (missing/expired/invalid token) | 401 |
-| `1002` | Wrong password | 401 |
+| `1002` | Wrong password (legacy; no longer used by the current social-only login flow) | 401 |
+| `1003` | Google/social credential invalid or expired | 401 |
+| `1004` | Authentication provider not supported | 401 |
 | `2001` | No permission / not allowed | 403 |
 | `2002` | Cannot modify another admin | 403 |
 | `3001` | Invalid field value | 400 |
@@ -204,6 +291,7 @@ Use `code` (not the HTTP status) for messages and special handling. Common codes
 | `6002` | Method not allowed | 405 |
 | `9001` | Uncategorized error | 500 |
 | `9005` | Unreadable HTTP message (bad JSON body) | 500 |
+| `9006` | Social provider unavailable | 500 |
 | `9701` | Storage service unavailable | 503 |
 | `9702` | Storage service error | 500 |
 
@@ -248,10 +336,17 @@ type GroupCreationRequestStatus = 'PENDING' | 'APPROVED' | 'REJECTD';
 
 // Role names
 type RoleName = 'ADMIN' | 'USER' | 'TRANSLATOR';
+
+// UserStatus — trạng thái tài khoản trong domain
+type UserStatus = 'PENDING_VERIFICATION' | 'ACTIVE' | 'BANNED' | 'DELETED';
 ```
 
 Suggested Vietnamese labels for `MangaStatus`:
 `COMPLETED → "Hoàn thành"`, `ONGOING → "Còn tiếp"`, `ONHOLD → "Tạm dừng"`.
+
+`UserStatus` is currently a domain enum only. The current user/admin response DTOs do
+not expose a `status` field, and no endpoint currently accepts or returns this value;
+frontend code should not expect it in `CurrentUserResponse` or `UserResponse` yet.
 
 ---
 
@@ -279,9 +374,8 @@ interface PageQuery {
 }
 
 // ---- Auth ----
-interface RegisterRequest { username: string; password: string; email?: string; }
-interface LoginRequest { username: string; password: string; }
-interface AuthResponse { authenticated: boolean; token: string; }
+interface AuthRequest { credential: string; } // Google ID token
+interface AuthenticationResponse { authenticated: boolean; token: string; expiresIn: number; }
 interface TokenRequest { token: string; }
 interface IntrospectResponse { valid: boolean; }
 
@@ -289,6 +383,7 @@ interface IntrospectResponse { valid: boolean; }
 interface CurrentUserResponse {
   id: string;
   username: string;
+  displayName: string | null;
   email: string | null;
   facebook: string | null;
   discord: string | null;
@@ -297,13 +392,14 @@ interface CurrentUserResponse {
   createdAt: string; // ISO-8601 instant
 }
 
-interface UserSummaryResponse { id: string; username: string; avatar: string | null; }
+interface UserSummaryResponse { id: string; username: string; displayName: string | null; avatar: string | null; }
 
 // GET /users/{username} — public profile, dùng được cho cả chính mình.
 // Không trả email, roles hay mật khẩu.
 interface PublicUserProfileResponse {
   id: string;
   username: string;
+  displayName: string | null;
   avatar: string | null;
   bio: string | null;
   facebook: string | null;
@@ -315,6 +411,7 @@ interface PublicUserProfileResponse {
 interface UserResponse {
   id: string;
   username: string;
+  displayName: string | null;
   email: string | null;
   facebook: string | null;
   discord: string | null;
@@ -334,9 +431,10 @@ interface UserCreationRequest {
 
 interface UserPasswordRequest { oldPassword: string; newPassword: string; }
 // PATCH /users/me and /admin/users/{id} are multipart with fields:
-//   email?, facebook?, discord?, bio? (<=300), avatar? (file)
+//   displayName? (<=50), facebook?, discord?, bio? (<=300), avatar? (file)
+// username and email are immutable and must not be sent.
 interface UserUpdateForm {
-  email?: string;
+  displayName?: string;
   facebook?: string;
   discord?: string;
   bio?: string;
@@ -559,16 +657,21 @@ Legend: **Auth** = required token; **Role** = required role; **RL** = rate limit
 
 | Method | Path | Body | Result |
 | --- | --- | --- | --- |
-| POST | `/auth/register` | `RegisterRequest` | `CurrentUserResponse` (no token) |
-| POST | `/auth/login` | `LoginRequest` | `AuthResponse` |
+| POST | `/auth/social/{provider}` | `AuthRequest` | `AuthenticationResponse` + refresh cookie |
 | POST | `/auth/introspect` | `TokenRequest` | `IntrospectResponse` |
-| POST | `/auth/logout` | `TokenRequest` | none |
-| POST | `/auth/refresh` | `TokenRequest` | `AuthResponse` |
+| POST | `/auth/logout` | no body; access token header + refresh cookie | none + cleared cookie |
+| POST | `/auth/refresh` | no body; refresh cookie | `AuthenticationResponse` + rotated refresh cookie |
 
-Rate limits: login `5/900 IP`; introspect `60/60 IP`; logout `10/60 USER_ID`;
-refresh `10/60 USER_ID`; register has no limit.
+There is currently no `@RateLimit` annotation on the social-login endpoint. Rate limits:
+introspect `60/60 IP`; logout `10/60 USER_ID`; refresh `10/60 USER_ID`.
+For logout/refresh requests without an authenticated application JWT, the rate-limit
+implementation falls back to the client IP.
 
-After register the user is **not** logged in; call `/auth/login` next.
+All requests in this table must use `credentials: 'include'` or
+`withCredentials: true`. The social-login endpoint is both registration and login, and
+returns an access JWT immediately while setting the refresh cookie. Do not call a
+separate register or username/password login endpoint;
+those endpoints no longer exist in the current backend.
 
 ### 7.2 Current user (authenticated)
 
@@ -580,7 +683,8 @@ After register the user is **not** logged in; call `/auth/login` next.
 
 `PATCH /users/me` is `multipart/form-data` (so it can carry the avatar file). Fields
 with `null`/omitted values are ignored (partial update). Uploading a new avatar deletes
-the old one. Note: `/users/me` does **not** return roles; decode the JWT `scope` claim
+the old one. `username` and `email` are immutable and are not accepted by this endpoint.
+Note: `/users/me` does **not** return roles; decode the JWT `scope` claim
 for role-based UI.
 
 ### 7.2.1 Public user profile (public)
@@ -590,8 +694,8 @@ for role-based UI.
 | GET | `/users/{username}` | no | — | — | — | `PublicUserProfileResponse` |
 
 - Ai cũng xem được, kể cả khách chưa đăng nhập; dùng được để xem chính mình.
-- Chỉ trả thông tin công khai: `id`, `username`, `avatar`, `bio`, `facebook`,
-  `discord`, `createdAt`, `transGroup`. **Không** có `email`, `roles`, mật khẩu.
+- Chỉ trả thông tin công khai: `id`, `username`, `displayName`, `avatar`, `bio`,
+  `facebook`, `discord`, `createdAt`, `transGroup`. **Không** có `email`, `roles`, mật khẩu.
 - `transGroup` là nhóm `APPROVED` mà user đang là member hoặc leader; `null` nếu không có.
 - `username` không phân biệt hoa thường. Không tồn tại → `4101` `USER_NOT_FOUND` (HTTP 404).
 - Không trả kèm truyện/chương của user.
@@ -785,7 +889,6 @@ auto-retrying immediately.
 
 Notable strict limits to design around:
 
-- `POST /auth/login`: 5 / 15 min per IP
 - `PATCH /users/me/password`: 5 / 15 min per user
 - `POST /transgroups/{groupId}/join-requests`: 3 / hour per user
 - `POST /files/upload-multi`: 3 / hour per user
@@ -819,7 +922,7 @@ Tailwind + shadcn/ui).
 src/
   api/
     client.ts          // axios instance: baseURL, auth header, error normalize
-    auth.ts            // login/register/refresh/logout/introspect
+    auth.ts            // Google social login/refresh/logout/introspect
     users.ts           // me, update me, admin users
     manga.ts
     chapter.ts
@@ -847,7 +950,6 @@ src/
     GroupsPage         // GET /transgroups
     GroupDetailPage    // GET /transgroups/{id}
     UserProfilePage    // GET /users/{username}
-    LoginPage / RegisterPage
     ProfilePage        // GET/PATCH /users/me, PATCH /users/me/password
     MyJoinRequestsPage // GET /users/me/join-requests
     CreateGroupRequestPage // POST /creation-requests
@@ -869,7 +971,7 @@ Routes and access:
 | `/`, `/mangas/:slug`, `/mangas/:slug/chapters/:chapterIndex` | public |
 | `/groups`, `/groups/:slug` | public |
 | `/users/:username` | public |
-| `/login`, `/register` | public |
+| Login modal | opened from the header or any protected action; Google Sign-In only |
 | `/profile`, `/my/join-requests`, `/groups/request` | authenticated |
 | `/manage/*` (manga/chapter editing) | `TRANSLATOR` (leader for group actions) |
 | `/admin/*` | `ADMIN` |
@@ -877,94 +979,41 @@ Routes and access:
 ### API client tips
 
 - One axios instance with `baseURL = VITE_API_BASE_URL` and an interceptor that adds
-  `Authorization: Bearer <token>` when a token exists.
-- A response interceptor should unwrap `ApiResponse<T>` and, on `code === '1001'`,
-  attempt a single `/auth/refresh`; if that fails, clear auth and redirect to `/login`.
-- Normalize errors to `{ code, message }` from the response body (fall back to the HTTP
-  status). Show `message` to users; special-case `6001` (rate limit) and `1001` (auth).
-- For pagination, use 0-based `page` in requests and display `result.currentPage`
-  (1-based) in the UI.
+  `Authorization: Bearer <access-token>` when a token exists.
+- Configure that Axios instance with `withCredentials: true`; the equivalent Fetch option
+  is credentials: 'include' on every request.
+- A response interceptor should unwrap `ApiResponse<T>`. On a `401`, if the request is
+  not `/auth/refresh` and has not already been retried, await one shared refresh promise.
+  The first failed request creates that promise; concurrent failed requests reuse it.
+  After refresh succeeds, update the in-memory access token and retry each original request
+  once. If refresh returns `401`, clear auth state and open the login modal; do not retry
+  the refresh request or retry the same original request again.
 
-### Key user flows to implement
-
-1. **Browse:** Home → paginated manga grid with category filter (fetch `/categories`
-   once, filter client-side or by future API); click a card → manga detail.
-2. **Read:** manga detail → chapter list (`sortBy=chapterIndex`) → open reader →
-   `GET /chapters/{id}/pages` → render images in order; track next/prev chapter.
-3. **Groups:** list → detail (leader, members, translated manga) → "Request to join"
-   (authenticated, non-member) → track in `/my/join-requests`.
-4. **Public profile:** click a member in a group → `/users/:username`
-   (`GET /users/{username}`) → avatar, bio, contact, join date, current group. Also
-   reachable for yourself from the account menu.
-5. **Create group:** authenticated non-member submits `POST /creation-requests`; admin
-   approves/rejects in `/admin/creation-requests`.
-6. **Translate/manage:** a `TRANSLATOR` who is in an active group can create manga
-   (`POST /mangas`), edit it, upload pages and create chapters, and delete chapters.
-7. **Group leader:** approve/reject join requests, kick members, edit group, remove the
-   group from a manga (must keep at least one active group).
-8. **Admin:** manage users, categories, and review group requests; browse all manga and
-   groups with status filters.
-
----
-
-## 12. Caveats and gotchas
-
-- `MangaResponse.transGroupsId` is a **list of `TransGroupSummaryResponse` objects**,
-  not a list of IDs, despite the field name.
-- `MangaDetailsResponse` has **no chapters**; always fetch `/mangas/{mangaId}/chapters`.
-- `GroupCreationRequestStatus` uses the misspelled literal value **`REJECTD`**
-  (not `REJECTED`).
-- Delete endpoints return a small DTO (e.g. `{ "groupId", "mangaId" }`) with
-  success `message`, not a bare string.
-- `PATCH /users/me` and `PATCH /admin/users/{id}` are multipart, not JSON. To clear a
-  field you cannot send `null` (nulls are ignored); there is no explicit "clear field"
-  operation.
-- `/users/me` does not include roles; derive roles from the JWT `scope` claim or from
-  an admin user fetch.
-- `POST /mangas` (not `/transgroups/{groupId}/mangas`) creates manga; the creator's
-  active group is added automatically.
-- Timestamps are ISO-8601 instants; `ChapterSummaryResponse.updatedAt` should be shown
-  as a date only.
-- The response wrapper omits `message` on ordinary success and omits `result` on void
-  operations — code defensively (`response.result`, not `response.data`).
-### Cover image flow
-
-Cover images are URL fields, not multipart fields on manga/group JSON endpoints.
-
-1. Upload an image with `POST /files/upload` using multipart field `file`, or use
-   `POST /files/upload-multi` with multipart field `files`.
-2. Store the returned public URL.
-3. Include that URL as `coverImageUrl` when creating/updating a manga or when
-   submitting/updating a translation-group profile.
-4. If no cover is available, omit the field or send `null`; clients should render a
-   local placeholder.
-
-Affected request models:
+#### Shared refresh implementation
 
 ```ts
-interface MangaCreationRequest {
-  name: string;
-  authorsName?: string;
-  coverImageUrl?: string;
-  transGroups?: string[];
-  categoryIds: number[];
-  status: 'COMPLETED' | 'ONGOING' | 'ONHOLD';
-  description?: string;
-}
+let accessToken: string | null = null;
+let refreshPromise: Promise<string> | null = null;
 
-interface MangaUpdateRequest extends Partial<MangaCreationRequest> {
-  addTransGroups?: string[];
-}
-
-interface CreationRequest {
-  groupName: string;
-  coverImageUrl?: string;
-  description?: string;
-}
-
-interface TransGroupUpdateRequest {
-  name?: string;
-  coverImageUrl?: string;
-  description?: string;
+async function refreshAccessToken(): Promise<string> {
+  if (!refreshPromise) {
+    refreshPromise = api.post('/auth/refresh', null, {
+      withCredentials: true,
+    })
+      .then(({ data }) => {
+        accessToken = data.result.token;
+        scheduleRefresh(data.result.expiresIn);
+        return accessToken;
+      })
+      .finally(() => {
+        refreshPromise = null;
+      });
+  }
+  return refreshPromise;
 }
 ```
+
+Set a per-request `_retry` flag before retrying. A `401` from `/auth/refresh` must reject
+this shared promise and must not trigger another refresh. When retrying the original
+request, use the new in-memory access token and preserve its method, URL, query, body,
+and `withCredentials` setting.

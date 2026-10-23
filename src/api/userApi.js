@@ -8,7 +8,12 @@ export const userApi = {
 
 	/* --- current user --- */
 	getMe: () => axiosClient.get(ENDPOINTS.users.me),
-	updateMe: (fields) => axiosClient.patch(ENDPOINTS.users.me, toFormData(fields), multipart()),
+	updateMe: ({ displayName, facebook, discord, bio, avatar }) =>
+		axiosClient.patch(
+			ENDPOINTS.users.me,
+			toFormData({ displayName, facebook, discord, bio, avatar }),
+			multipart(),
+		),
 	changePassword: (payload) => axiosClient.patch(ENDPOINTS.users.mePassword, payload),
 	getMyJoinRequests: (params) => axiosClient.get(ENDPOINTS.users.meJoinRequests, { params }),
 	getMyCreationRequests: (params) =>

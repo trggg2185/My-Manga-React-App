@@ -22,18 +22,13 @@
  * @property {number} [size]
  * @property {string} [sortBy] hướng luôn là DESC
  *
- * @typedef {Object} RegisterRequest
- * @property {string} username
- * @property {string} password
- * @property {string} [email]
+ * @typedef {Object} SocialAuthRequest
+ * @property {string} credential Google ID token
  *
- * @typedef {Object} LoginRequest
- * @property {string} username
- * @property {string} password
- *
- * @typedef {Object} AuthResponse
+ * @typedef {Object} AuthenticationResponse
  * @property {boolean} authenticated
  * @property {string} token
+ * @property {number} expiresIn giây
  *
  * @typedef {Object} IntrospectResponse
  * @property {boolean} valid
@@ -41,6 +36,7 @@
  * @typedef {Object} CurrentUserResponse
  * @property {string} id
  * @property {string} username
+ * @property {string|null} displayName
  * @property {string|null} email
  * @property {string|null} facebook
  * @property {string|null} discord
@@ -51,11 +47,13 @@
  * @typedef {Object} UserSummaryResponse
  * @property {string} id
  * @property {string} username
+ * @property {string|null} displayName
  * @property {string|null} avatar
  *
  * @typedef {Object} PublicUserProfileResponse
  * @property {string} id
  * @property {string} username
+ * @property {string|null} displayName
  * @property {string|null} avatar
  * @property {string|null} bio
  * @property {string|null} facebook
@@ -66,6 +64,7 @@
  * @typedef {Object} UserResponse
  * @property {string} id
  * @property {string} username
+ * @property {string|null} displayName
  * @property {string|null} email
  * @property {string|null} facebook
  * @property {string|null} discord
@@ -82,7 +81,7 @@
  * @property {string[]} [roles]
  *
  * @typedef {Object} UserUpdateForm
- * @property {string} [email]
+ * @property {string} [displayName] <=50
  * @property {string} [facebook]
  * @property {string} [discord]
  * @property {string} [bio] <=300

@@ -130,7 +130,7 @@ function MangaEditorPage() {
 				}
 			/>
 
-			<form onSubmit={submit} className="max-w-2xl space-y-4 rounded-2xl border border-white/10 bg-ink-900 p-6">
+			<form onSubmit={submit} className="mx-auto w-full max-w-3xl space-y-4 rounded-2xl border border-white/10 bg-ink-900 p-6">
 				<Input
 					label="Tên truyện"
 					value={form.name}

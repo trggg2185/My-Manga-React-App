@@ -1,8 +1,7 @@
 // Toàn bộ đường dẫn API (không kèm baseURL / context path).
 export const ENDPOINTS = {
 	auth: {
-		register: '/auth/register',
-		login: '/auth/login',
+		social: (provider) => `/auth/social/${provider}`,
 		logout: '/auth/logout',
 		refresh: '/auth/refresh',
 		introspect: '/auth/introspect',
